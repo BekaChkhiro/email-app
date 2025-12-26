@@ -114,24 +114,24 @@ export default function CampaignDetailPage() {
     }
   };
 
-  const getStatusColor = (status: string) => {
+  const getStatusBadge = (status: string) => {
     switch (status) {
       case "active":
-        return "bg-green-100 text-green-700";
+        return "badge-success";
       case "paused":
-        return "bg-yellow-100 text-yellow-700";
+        return "badge-warning";
       case "completed":
-        return "bg-blue-100 text-blue-700";
+        return "badge-info";
       case "stopped":
-        return "bg-red-100 text-red-700";
+        return "badge-danger";
       case "draft":
-        return "bg-gray-100 text-gray-700";
+        return "badge-neutral";
       case "sent":
-        return "bg-green-100 text-green-700";
+        return "badge-success";
       case "failed":
-        return "bg-red-100 text-red-700";
+        return "badge-danger";
       default:
-        return "bg-gray-100 text-gray-700";
+        return "badge-neutral";
     }
   };
 
@@ -181,9 +181,16 @@ export default function CampaignDetailPage() {
   if (isLoading) {
     return (
       <div className="p-6">
-        <div className="animate-pulse space-y-4">
-          <div className="h-8 w-64 bg-gray-200 rounded" />
-          <div className="h-48 bg-gray-100 rounded" />
+        <div className="space-y-6">
+          <div className="flex items-center gap-4">
+            <div className="skeleton h-10 w-10 rounded-xl" />
+            <div>
+              <div className="skeleton h-7 w-64 mb-2" />
+              <div className="skeleton h-4 w-40" />
+            </div>
+          </div>
+          <div className="skeleton h-48 rounded-xl" />
+          <div className="skeleton h-64 rounded-xl" />
         </div>
       </div>
     );
@@ -191,11 +198,18 @@ export default function CampaignDetailPage() {
 
   if (!campaign) {
     return (
-      <div className="p-6 text-center">
-        <p>Campaign not found</p>
-        <Link href="/campaigns" className="text-blue-600 hover:underline">
-          Back to Campaigns
-        </Link>
+      <div className="p-6">
+        <div className="empty-state py-16">
+          <div className="icon-container icon-container-lg mx-auto mb-4">
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <p className="text-slate-600 font-medium mb-2">Campaign not found</p>
+          <Link href="/campaigns" className="text-sky-600 hover:text-sky-700 font-medium">
+            Back to Campaigns
+          </Link>
+        </div>
       </div>
     );
   }
@@ -217,29 +231,28 @@ export default function CampaignDetailPage() {
         <div className="flex items-center gap-4">
           <button
             onClick={() => router.push("/campaigns")}
-            className="p-2 hover:bg-gray-100 rounded-lg"
+            className="p-2.5 hover:bg-slate-100 rounded-xl transition-colors"
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-5 h-5 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
           </button>
           <div>
-            <h1 className="text-2xl font-bold">{campaign.name}</h1>
-            <div className="flex items-center gap-2 mt-1">
-              <span
-                className={`px-2 py-0.5 rounded-full text-xs ${getStatusColor(
-                  campaign.status || "draft"
-                )}`}
-              >
+            <h1 className="text-2xl font-bold text-slate-900">{campaign.name}</h1>
+            <div className="flex items-center gap-3 mt-1">
+              <span className={getStatusBadge(campaign.status || "draft")}>
                 {campaign.status || "draft"}
               </span>
               {campaign.status === "active" && (
-                <span className="text-green-600 text-sm flex items-center gap-1">
-                  <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                <span className="flex items-center gap-1.5 text-emerald-600 text-sm font-medium">
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                  </span>
                   Live
                 </span>
               )}
-              <span className="text-gray-500 text-sm">
+              <span className="text-slate-400 text-sm">
                 Created {formatDate(campaign.createdAt)}
               </span>
             </div>
@@ -252,8 +265,11 @@ export default function CampaignDetailPage() {
             <button
               onClick={() => handleAction("launch")}
               disabled={isUpdating}
-              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
+              className="px-4 py-2.5 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white font-medium rounded-xl hover:from-emerald-600 hover:to-emerald-700 disabled:opacity-50 shadow-lg shadow-emerald-500/25 transition-all duration-200 flex items-center gap-2"
             >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
               Launch
             </button>
           )}
@@ -262,14 +278,17 @@ export default function CampaignDetailPage() {
               <button
                 onClick={() => handleAction("pause")}
                 disabled={isUpdating}
-                className="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 disabled:opacity-50"
+                className="btn-warning"
               >
+                <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
                 Pause
               </button>
               <button
                 onClick={() => handleAction("stop")}
                 disabled={isUpdating}
-                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
+                className="btn-danger"
               >
                 Stop
               </button>
@@ -280,14 +299,18 @@ export default function CampaignDetailPage() {
               <button
                 onClick={() => handleAction("resume")}
                 disabled={isUpdating}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                className="btn-primary"
               >
+                <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
                 Resume
               </button>
               <button
                 onClick={() => handleAction("stop")}
                 disabled={isUpdating}
-                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
+                className="btn-danger"
               >
                 Stop
               </button>
@@ -300,20 +323,20 @@ export default function CampaignDetailPage() {
         {/* Main Content */}
         <div className="lg:col-span-2 space-y-6">
           {/* Progress Card */}
-          <div className="bg-white border rounded-lg p-6">
-            <h2 className="text-lg font-semibold mb-4">Progress</h2>
+          <div className="card p-6">
+            <h2 className="text-lg font-semibold text-slate-900 mb-4">Progress</h2>
 
             {/* Overall Progress */}
             <div className="mb-6">
               <div className="flex justify-between text-sm mb-2">
-                <span className="text-gray-600">
+                <span className="text-slate-600">
                   {campaign.sentCount} of {campaign.totalRecipients} emails sent
                 </span>
-                <span className="font-medium">{Math.round(progress)}%</span>
+                <span className="font-semibold text-slate-900">{Math.round(progress)}%</span>
               </div>
-              <div className="h-3 bg-gray-200 rounded-full overflow-hidden">
+              <div className="progress-bar">
                 <div
-                  className="h-full bg-blue-600 rounded-full transition-all"
+                  className="progress-fill"
                   style={{ width: `${progress}%` }}
                 />
               </div>
@@ -321,21 +344,24 @@ export default function CampaignDetailPage() {
 
             {/* Today's Progress */}
             {campaign.status === "active" && (
-              <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+              <div className="mb-6 p-4 bg-slate-50 rounded-xl">
                 <div className="flex justify-between text-sm mb-2">
-                  <span className="text-gray-600">Today&apos;s Progress</span>
-                  <span className="font-medium">
+                  <span className="text-slate-600">Today&apos;s Progress</span>
+                  <span className="font-semibold text-slate-900">
                     {todaySentCount} / {campaign.dailyLimit} daily limit
                   </span>
                 </div>
-                <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                <div className="h-2 bg-slate-200 rounded-full overflow-hidden">
                   <div
-                    className="h-full bg-green-500 rounded-full transition-all"
+                    className="h-full bg-gradient-to-r from-emerald-400 to-emerald-500 rounded-full transition-all"
                     style={{ width: `${Math.min(dailyProgress, 100)}%` }}
                   />
                 </div>
                 {nextSend && (
-                  <p className="text-xs text-gray-500 mt-2">
+                  <p className="text-xs text-slate-500 mt-2 flex items-center gap-1">
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
                     Next batch: ~{formatTime(nextSend.toISOString())}
                   </p>
                 )}
@@ -343,104 +369,98 @@ export default function CampaignDetailPage() {
             )}
 
             {/* Stats */}
-            <div className="grid grid-cols-4 gap-4 pt-4 border-t">
-              <div>
-                <p className="text-2xl font-bold text-gray-900">
+            <div className="grid grid-cols-4 gap-4 pt-4 border-t border-slate-100">
+              <div className="text-center">
+                <p className="text-2xl font-bold text-slate-400">
                   {campaign.recipientStats?.pending || 0}
                 </p>
-                <p className="text-sm text-gray-500">Pending</p>
+                <p className="text-sm text-slate-500">Pending</p>
               </div>
-              <div>
-                <p className="text-2xl font-bold text-green-600">
+              <div className="text-center">
+                <p className="text-2xl font-bold text-emerald-600">
                   {campaign.recipientStats?.sent || 0}
                 </p>
-                <p className="text-sm text-gray-500">Sent</p>
+                <p className="text-sm text-slate-500">Sent</p>
               </div>
-              <div>
-                <p className="text-2xl font-bold text-red-600">
+              <div className="text-center">
+                <p className="text-2xl font-bold text-red-500">
                   {campaign.recipientStats?.failed || 0}
                 </p>
-                <p className="text-sm text-gray-500">Failed</p>
+                <p className="text-sm text-slate-500">Failed</p>
               </div>
-              <div>
-                <p className="text-2xl font-bold text-gray-400">
+              <div className="text-center">
+                <p className="text-2xl font-bold text-slate-300">
                   {campaign.recipientStats?.skipped || 0}
                 </p>
-                <p className="text-sm text-gray-500">Skipped</p>
+                <p className="text-sm text-slate-500">Skipped</p>
               </div>
             </div>
           </div>
 
           {/* Tabs: Recipients / Activity */}
-          <div className="bg-white border rounded-lg overflow-hidden">
-            <div className="flex border-b">
+          <div className="card overflow-hidden">
+            <div className="flex border-b border-slate-100">
               <button
                 onClick={() => setActiveTab("recipients")}
-                className={`flex-1 px-4 py-3 text-sm font-medium ${
+                className={`flex-1 px-4 py-3.5 text-sm font-medium transition-colors relative ${
                   activeTab === "recipients"
-                    ? "text-blue-600 border-b-2 border-blue-600"
-                    : "text-gray-500 hover:text-gray-700"
+                    ? "text-sky-600"
+                    : "text-slate-500 hover:text-slate-700"
                 }`}
               >
                 Recipients
+                {activeTab === "recipients" && (
+                  <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-sky-500 to-sky-600" />
+                )}
               </button>
               <button
                 onClick={() => setActiveTab("activity")}
-                className={`flex-1 px-4 py-3 text-sm font-medium ${
+                className={`flex-1 px-4 py-3.5 text-sm font-medium transition-colors relative ${
                   activeTab === "activity"
-                    ? "text-blue-600 border-b-2 border-blue-600"
-                    : "text-gray-500 hover:text-gray-700"
+                    ? "text-sky-600"
+                    : "text-slate-500 hover:text-slate-700"
                 }`}
               >
                 Recent Activity
+                {activeTab === "activity" && (
+                  <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-sky-500 to-sky-600" />
+                )}
               </button>
             </div>
 
             {activeTab === "recipients" ? (
               <div className="overflow-x-auto">
                 <table className="w-full">
-                  <thead className="bg-gray-50">
+                  <thead className="table-header">
                     <tr>
-                      <th className="p-3 text-left text-sm font-medium text-gray-600">
-                        Company
-                      </th>
-                      <th className="p-3 text-left text-sm font-medium text-gray-600">
-                        Email
-                      </th>
-                      <th className="p-3 text-left text-sm font-medium text-gray-600">
-                        Status
-                      </th>
-                      <th className="p-3 text-left text-sm font-medium text-gray-600">
-                        Sent At
-                      </th>
+                      <th className="table-header-cell">Company</th>
+                      <th className="table-header-cell">Email</th>
+                      <th className="table-header-cell">Status</th>
+                      <th className="table-header-cell">Sent At</th>
                     </tr>
                   </thead>
-                  <tbody>
+                  <tbody className="divide-y divide-slate-100">
                     {campaign.sampleRecipients.length === 0 ? (
                       <tr>
-                        <td colSpan={4} className="p-8 text-center text-gray-500">
+                        <td colSpan={4} className="p-8 text-center text-slate-500">
                           No recipients
                         </td>
                       </tr>
                     ) : (
                       campaign.sampleRecipients.map((recipient) => (
-                        <tr key={recipient.id} className="border-t">
-                          <td className="p-3 text-sm">
+                        <tr key={recipient.id} className="hover:bg-slate-50/50 transition-colors">
+                          <td className="table-cell font-medium text-slate-900">
                             {recipient.companyName || "-"}
                           </td>
-                          <td className="p-3 text-sm text-gray-600">
+                          <td className="table-cell text-slate-600">
                             {recipient.email || "-"}
                           </td>
-                          <td className="p-3">
-                            <span
-                              className={`px-2 py-0.5 rounded-full text-xs ${getStatusColor(
-                                recipient.status || "pending"
-                              )}`}
-                            >
+                          <td className="table-cell">
+                            <span className={getStatusBadge(recipient.status || "pending")}>
                               {recipient.status || "pending"}
                             </span>
                           </td>
-                          <td className="p-3 text-sm text-gray-500">
+                          <td className="table-cell text-slate-500">
                             {formatDate(recipient.sentAt)}
                           </td>
                         </tr>
@@ -452,32 +472,33 @@ export default function CampaignDetailPage() {
             ) : (
               <div className="p-4 space-y-3">
                 {recentActivity.length === 0 ? (
-                  <div className="text-center py-8 text-gray-500">
-                    No activity yet
+                  <div className="empty-state py-12">
+                    <div className="icon-container mx-auto mb-3">
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </div>
+                    <p className="text-slate-500">No activity yet</p>
                   </div>
                 ) : (
                   recentActivity.map((activity) => (
                     <div
                       key={activity.id}
-                      className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                      className="flex items-center justify-between p-4 bg-slate-50 rounded-xl hover:bg-slate-100/80 transition-colors"
                     >
                       <div>
-                        <p className="font-medium text-sm">
+                        <p className="font-medium text-slate-900 text-sm">
                           {activity.companyName || activity.email}
                         </p>
-                        <p className="text-xs text-gray-500 truncate max-w-[300px]">
+                        <p className="text-xs text-slate-500 truncate max-w-[300px]">
                           {activity.subject}
                         </p>
                       </div>
                       <div className="text-right">
-                        <span
-                          className={`px-2 py-0.5 rounded-full text-xs ${getStatusColor(
-                            activity.status
-                          )}`}
-                        >
+                        <span className={getStatusBadge(activity.status)}>
                           {activity.status}
                         </span>
-                        <p className="text-xs text-gray-500 mt-1">
+                        <p className="text-xs text-slate-400 mt-1">
                           {formatTime(activity.sentAt)}
                         </p>
                       </div>
@@ -492,42 +513,42 @@ export default function CampaignDetailPage() {
         {/* Sidebar */}
         <div className="space-y-6">
           {/* Campaign Info */}
-          <div className="bg-white border rounded-lg p-6">
-            <h3 className="font-semibold mb-4">Campaign Details</h3>
+          <div className="card p-5">
+            <h3 className="font-semibold text-slate-900 mb-4">Campaign Details</h3>
             <div className="space-y-3 text-sm">
-              <div className="flex justify-between">
-                <span className="text-gray-500">Template</span>
-                <span className="font-medium">
+              <div className="flex justify-between py-2 border-b border-slate-100">
+                <span className="text-slate-500">Template</span>
+                <span className="font-medium text-slate-900">
                   {campaign.templateName || "None"}
                 </span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-gray-500">Daily Limit</span>
-                <span>{campaign.dailyLimit} emails/day</span>
+              <div className="flex justify-between py-2 border-b border-slate-100">
+                <span className="text-slate-500">Daily Limit</span>
+                <span className="text-slate-700">{campaign.dailyLimit} emails/day</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-gray-500">Send Window</span>
-                <span>
+              <div className="flex justify-between py-2 border-b border-slate-100">
+                <span className="text-slate-500">Send Window</span>
+                <span className="text-slate-700">
                   {campaign.sendStartHour.toString().padStart(2, "0")}:00 -{" "}
                   {campaign.sendEndHour.toString().padStart(2, "0")}:00
                 </span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-gray-500">Total Recipients</span>
-                <span>{campaign.totalRecipients}</span>
+              <div className="flex justify-between py-2 border-b border-slate-100">
+                <span className="text-slate-500">Total Recipients</span>
+                <span className="text-slate-700">{campaign.totalRecipients}</span>
               </div>
               {campaign.startedAt && (
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Started</span>
-                  <span>{formatDate(campaign.startedAt)}</span>
+                <div className="flex justify-between py-2 border-b border-slate-100">
+                  <span className="text-slate-500">Started</span>
+                  <span className="text-slate-700">{formatDate(campaign.startedAt)}</span>
                 </div>
               )}
               {campaign.completedAt && (
-                <div className="flex justify-between">
-                  <span className="text-gray-500">
+                <div className="flex justify-between py-2">
+                  <span className="text-slate-500">
                     {campaign.status === "stopped" ? "Stopped" : "Completed"}
                   </span>
-                  <span>{formatDate(campaign.completedAt)}</span>
+                  <span className="text-slate-700">{formatDate(campaign.completedAt)}</span>
                 </div>
               )}
             </div>
@@ -535,32 +556,40 @@ export default function CampaignDetailPage() {
 
           {/* Estimated Completion */}
           {campaign.status === "active" && campaign.totalRecipients > campaign.sentCount && (
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <h3 className="font-semibold text-blue-800 mb-2">Estimated Completion</h3>
-              <p className="text-sm text-blue-700">
+            <div className="bg-gradient-to-br from-sky-50 to-sky-100/50 border border-sky-200 rounded-xl p-5">
+              <div className="flex items-center gap-2 mb-2">
+                <svg className="w-5 h-5 text-sky-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                <h3 className="font-semibold text-sky-900">Estimated Completion</h3>
+              </div>
+              <p className="text-2xl font-bold text-sky-700">
                 {Math.ceil(
                   (campaign.totalRecipients - campaign.sentCount) / campaign.dailyLimit
                 )}{" "}
-                days remaining
+                <span className="text-base font-normal">days remaining</span>
               </p>
             </div>
           )}
 
           {/* Template Preview */}
           {campaign.templateId && (
-            <div className="bg-white border rounded-lg overflow-hidden">
-              <div className="p-4 border-b">
-                <h3 className="font-semibold">Template Preview</h3>
+            <div className="card overflow-hidden">
+              <div className="px-5 py-4 border-b border-slate-100">
+                <h3 className="font-semibold text-slate-900">Template Preview</h3>
               </div>
-              <div className="p-4">
-                <p className="text-sm text-gray-600 mb-2">
-                  Subject: {campaign.templateSubject}
+              <div className="p-5">
+                <p className="text-sm text-slate-600 mb-3">
+                  <span className="text-slate-400">Subject:</span> {campaign.templateSubject}
                 </p>
                 <Link
                   href={`/templates/${campaign.templateId}`}
-                  className="text-sm text-blue-600 hover:underline"
+                  className="inline-flex items-center gap-1.5 text-sm text-sky-600 hover:text-sky-700 font-medium"
                 >
                   View Template
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
                 </Link>
               </div>
             </div>

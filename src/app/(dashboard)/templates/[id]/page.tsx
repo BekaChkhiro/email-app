@@ -139,7 +139,7 @@ export default function TemplateEditorPage() {
     TEMPLATE_VARIABLES.forEach((v) => {
       preview = preview.replace(
         new RegExp(`\\{\\{${v.key}\\}\\}`, "g"),
-        `<span class="bg-blue-100 text-blue-700 px-1 rounded">${v.label}</span>`
+        `<span class="bg-sky-100 text-sky-700 px-1.5 py-0.5 rounded text-sm font-medium">${v.label}</span>`
       );
     });
     return preview;
@@ -160,9 +160,18 @@ export default function TemplateEditorPage() {
   if (isLoading) {
     return (
       <div className="p-6">
-        <div className="animate-pulse space-y-4">
-          <div className="h-8 w-64 bg-gray-200 rounded" />
-          <div className="h-96 bg-gray-100 rounded" />
+        <div className="space-y-6">
+          <div className="flex items-center gap-4">
+            <div className="skeleton h-10 w-10 rounded-xl" />
+            <div>
+              <div className="skeleton h-7 w-48 mb-2" />
+              <div className="skeleton h-4 w-32" />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-6">
+            <div className="skeleton h-96 rounded-xl" />
+            <div className="skeleton h-96 rounded-xl" />
+          </div>
         </div>
       </div>
     );
@@ -170,8 +179,15 @@ export default function TemplateEditorPage() {
 
   if (!template) {
     return (
-      <div className="p-6 text-center">
-        <p>Template not found</p>
+      <div className="p-6">
+        <div className="empty-state py-16">
+          <div className="icon-container icon-container-lg mx-auto mb-4">
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <p className="text-slate-600 font-medium">Template not found</p>
+        </div>
       </div>
     );
   }
@@ -183,32 +199,53 @@ export default function TemplateEditorPage() {
         <div className="flex items-center gap-4">
           <button
             onClick={() => router.push("/templates")}
-            className="p-2 hover:bg-gray-100 rounded-lg"
+            className="p-2.5 hover:bg-slate-100 rounded-xl transition-colors"
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-5 h-5 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
           </button>
           <div>
-            <h1 className="text-2xl font-bold">Edit Template</h1>
+            <h1 className="text-2xl font-bold text-slate-900">Edit Template</h1>
             {hasChanges && (
-              <span className="text-sm text-orange-600">Unsaved changes</span>
+              <span className="inline-flex items-center gap-1.5 text-sm text-amber-600">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                Unsaved changes
+              </span>
             )}
           </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-3">
           <button
             onClick={() => setShowTestModal(true)}
-            className="px-4 py-2 border rounded-lg hover:bg-gray-50"
+            className="btn-secondary"
           >
+            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+            </svg>
             Send Test
           </button>
           <button
             onClick={handleSave}
             disabled={isSaving || !hasChanges}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+            className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {isSaving ? "Saving..." : "Save Changes"}
+            {isSaving ? (
+              <>
+                <svg className="animate-spin h-4 w-4 mr-2" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
+                Saving...
+              </>
+            ) : (
+              <>
+                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+                Save Changes
+              </>
+            )}
           </button>
         </div>
       </div>
@@ -217,27 +254,27 @@ export default function TemplateEditorPage() {
         {/* Editor Side */}
         <div className="space-y-4">
           {/* Template Name */}
-          <div>
-            <label className="block text-sm font-medium mb-1">Template Name</label>
+          <div className="card p-4">
+            <label className="block text-sm font-medium text-slate-700 mb-2">Template Name</label>
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g., Welcome Email"
-              className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="input-field"
             />
           </div>
 
           {/* Subject Line */}
-          <div>
-            <div className="flex items-center justify-between mb-1">
-              <label className="text-sm font-medium">Subject Line</label>
+          <div className="card p-4">
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-sm font-medium text-slate-700">Subject Line</label>
               <div className="flex gap-1">
                 {TEMPLATE_VARIABLES.slice(0, 3).map((v) => (
                   <button
                     key={v.key}
                     onClick={() => insertVariable(v.key, "subject")}
-                    className="px-2 py-0.5 text-xs bg-gray-100 hover:bg-gray-200 rounded"
+                    className="px-2.5 py-1 text-xs bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg transition-colors"
                     title={`Insert {{${v.key}}}`}
                   >
                     {v.label}
@@ -250,31 +287,33 @@ export default function TemplateEditorPage() {
               value={subject}
               onChange={(e) => setSubject(e.target.value)}
               placeholder="e.g., Special offer for {{company_name}}"
-              className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="input-field"
             />
           </div>
 
           {/* Variables */}
-          <div className="bg-gray-50 rounded-lg p-3">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-medium">Insert Variable:</span>
-              <div className="flex gap-2">
+          <div className="card p-4">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-sm font-medium text-slate-700">Insert Variable</span>
+              <div className="flex items-center gap-2">
                 <button
                   onClick={() => setIsHtmlMode(!isHtmlMode)}
-                  className={`px-2 py-1 text-xs rounded ${
-                    isHtmlMode ? "bg-blue-600 text-white" : "bg-gray-200"
+                  className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+                    isHtmlMode
+                      ? "bg-sky-500 text-white"
+                      : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                   }`}
                 >
-                  HTML
+                  HTML Mode
                 </button>
               </div>
             </div>
-            <div className="flex flex-wrap gap-1">
+            <div className="flex flex-wrap gap-2">
               {TEMPLATE_VARIABLES.map((v) => (
                 <button
                   key={v.key}
                   onClick={() => insertVariable(v.key, "content")}
-                  className="px-2 py-1 text-xs bg-white border rounded hover:border-blue-500 hover:text-blue-600"
+                  className="px-3 py-1.5 text-xs bg-white border border-slate-200 rounded-lg hover:border-sky-300 hover:text-sky-600 transition-colors font-mono"
                 >
                   {"{{" + v.key + "}}"}
                 </button>
@@ -283,22 +322,24 @@ export default function TemplateEditorPage() {
           </div>
 
           {/* Editor */}
-          <div className="border rounded-lg overflow-hidden">
+          <div className="card overflow-hidden">
             {isHtmlMode ? (
               <textarea
                 value={htmlContent}
                 onChange={(e) => setHtmlContent(e.target.value)}
-                className="w-full h-96 p-4 font-mono text-sm focus:outline-none"
+                className="w-full h-96 p-4 font-mono text-sm focus:outline-none border-0 resize-none bg-slate-50"
                 placeholder="Enter HTML content..."
               />
             ) : (
-              <ReactQuill
-                value={htmlContent}
-                onChange={setHtmlContent}
-                modules={quillModules}
-                className="h-96"
-                theme="snow"
-              />
+              <div className="template-editor">
+                <ReactQuill
+                  value={htmlContent}
+                  onChange={setHtmlContent}
+                  modules={quillModules}
+                  className="h-96"
+                  theme="snow"
+                />
+              </div>
             )}
           </div>
         </div>
@@ -306,41 +347,56 @@ export default function TemplateEditorPage() {
         {/* Preview Side */}
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold">Preview</h2>
-            <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
+            <h2 className="text-lg font-semibold text-slate-900">Preview</h2>
+            <div className="flex bg-slate-100 rounded-xl p-1">
               <button
                 onClick={() => setPreviewMode("desktop")}
-                className={`px-3 py-1 text-sm rounded ${
-                  previewMode === "desktop" ? "bg-white shadow-sm" : ""
+                className={`px-4 py-1.5 text-sm font-medium rounded-lg transition-all ${
+                  previewMode === "desktop"
+                    ? "bg-white shadow-sm text-slate-900"
+                    : "text-slate-500 hover:text-slate-700"
                 }`}
               >
+                <svg className="w-4 h-4 inline-block mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                </svg>
                 Desktop
               </button>
               <button
                 onClick={() => setPreviewMode("mobile")}
-                className={`px-3 py-1 text-sm rounded ${
-                  previewMode === "mobile" ? "bg-white shadow-sm" : ""
+                className={`px-4 py-1.5 text-sm font-medium rounded-lg transition-all ${
+                  previewMode === "mobile"
+                    ? "bg-white shadow-sm text-slate-900"
+                    : "text-slate-500 hover:text-slate-700"
                 }`}
               >
+                <svg className="w-4 h-4 inline-block mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                </svg>
                 Mobile
               </button>
             </div>
           </div>
 
           <div
-            className={`border rounded-lg bg-white overflow-hidden ${
+            className={`card overflow-hidden transition-all duration-300 ${
               previewMode === "mobile" ? "max-w-[375px] mx-auto" : ""
             }`}
           >
             {/* Email Header */}
-            <div className="border-b p-4 bg-gray-50">
-              <div className="text-sm text-gray-500 mb-1">Subject:</div>
-              <div className="font-medium">{subject || "No subject"}</div>
+            <div className="border-b border-slate-100 p-4 bg-slate-50">
+              <div className="flex items-center gap-2 text-sm text-slate-500 mb-1">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                </svg>
+                Subject:
+              </div>
+              <div className="font-medium text-slate-900">{subject || "No subject"}</div>
             </div>
 
             {/* Email Body */}
             <div
-              className="p-6 min-h-[400px] prose prose-sm max-w-none"
+              className="p-6 min-h-[400px] prose prose-sm max-w-none bg-white"
               dangerouslySetInnerHTML={{ __html: getPreviewContent() }}
             />
           </div>
@@ -349,10 +405,17 @@ export default function TemplateEditorPage() {
 
       {/* Test Email Modal */}
       {showTestModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
-            <h3 className="text-lg font-semibold mb-4">Send Test Email</h3>
-            <p className="text-sm text-gray-600 mb-4">
+        <div className="modal-backdrop" onClick={() => setShowTestModal(false)}>
+          <div className="modal-content max-w-md" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center gap-3 mb-4">
+              <div className="icon-container">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                </svg>
+              </div>
+              <h3 className="text-lg font-semibold text-slate-900">Send Test Email</h3>
+            </div>
+            <p className="text-sm text-slate-600 mb-4">
               Send a test email to preview how your template looks in an inbox.
               Variables will be replaced with sample data.
             </p>
@@ -361,21 +424,36 @@ export default function TemplateEditorPage() {
               value={testEmail}
               onChange={(e) => setTestEmail(e.target.value)}
               placeholder="Enter email address"
-              className="w-full px-3 py-2 border rounded-lg mb-4 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="input-field mb-4"
             />
-            <div className="flex justify-end gap-2">
+            <div className="flex justify-end gap-3">
               <button
                 onClick={() => setShowTestModal(false)}
-                className="px-4 py-2 border rounded-lg hover:bg-gray-50"
+                className="btn-secondary"
               >
                 Cancel
               </button>
               <button
                 onClick={handleSendTest}
                 disabled={isSendingTest}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                className="btn-primary disabled:opacity-50"
               >
-                {isSendingTest ? "Sending..." : "Send Test"}
+                {isSendingTest ? (
+                  <>
+                    <svg className="animate-spin h-4 w-4 mr-2" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                    </svg>
+                    Sending...
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                    </svg>
+                    Send Test
+                  </>
+                )}
               </button>
             </div>
           </div>
