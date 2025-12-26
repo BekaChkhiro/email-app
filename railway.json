@@ -1,0 +1,25 @@
+{
+  "$schema": "https://railway.app/railway.schema.json",
+  "build": {
+    "builder": "NIXPACKS"
+  },
+  "deploy": {
+    "numReplicas": 1,
+    "sleepApplication": false,
+    "restartPolicyType": "ON_FAILURE",
+    "restartPolicyMaxRetries": 10,
+    "startCommand": "npm start",
+    "healthcheckPath": "/api/health",
+    "healthcheckTimeout": 300
+  },
+  "crons": [
+    {
+      "name": "process-email-queue",
+      "schedule": "*/5 * * * *",
+      "endpoint": "/api/cron/process-queue",
+      "headers": {
+        "Authorization": "Bearer ${{CRON_SECRET}}"
+      }
+    }
+  ]
+}
