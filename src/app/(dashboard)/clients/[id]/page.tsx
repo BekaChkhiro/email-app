@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter, useParams } from "next/navigation";
 import { ClientHistory } from "@/components/clients/ClientHistory";
 import { ClientNotes } from "@/components/clients/ClientNotes";
+import { ComposeEmailModal } from "@/components/emails/ComposeEmailModal";
 import type { Client } from "@/db/schema";
 
 export default function ClientDetailsPage() {
@@ -17,6 +18,7 @@ export default function ClientDetailsPage() {
   const [editData, setEditData] = useState<Partial<Client>>({});
   const [isSaving, setIsSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<"history" | "notes">("history");
+  const [isComposeOpen, setIsComposeOpen] = useState(false);
 
   useEffect(() => {
     fetch(`/api/clients/${id}`)
@@ -479,7 +481,10 @@ export default function ClientDetailsPage() {
               <h3 className="font-semibold text-slate-900">Actions</h3>
             </div>
             <div className="space-y-2">
-              <button className="w-full btn-secondary justify-start">
+              <button
+                onClick={() => setIsComposeOpen(true)}
+                className="w-full btn-secondary justify-start"
+              >
                 <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                 </svg>
@@ -501,6 +506,17 @@ export default function ClientDetailsPage() {
           </div>
         </div>
       </div>
+
+      {/* Compose Email Modal */}
+      <ComposeEmailModal
+        isOpen={isComposeOpen}
+        onClose={() => setIsComposeOpen(false)}
+        client={client}
+        onSuccess={() => {
+          // Trigger refresh of email history by forcing re-render
+          setActiveTab("history");
+        }}
+      />
     </div>
   );
 }

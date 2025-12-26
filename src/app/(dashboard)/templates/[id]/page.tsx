@@ -20,6 +20,7 @@ const TEMPLATE_VARIABLES = [
 export default function TemplateEditorPage() {
   const params = useParams();
   const id = params.id as string;
+  const isNew = id === "new";
   const router = useRouter();
 
   const [template, setTemplate] = useState<EmailTemplate | null>(null);
@@ -28,7 +29,7 @@ export default function TemplateEditorPage() {
   const [htmlContent, setHtmlContent] = useState("");
   const [isHtmlMode, setIsHtmlMode] = useState(false);
   const [previewMode, setPreviewMode] = useState<"desktop" | "mobile">("desktop");
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(!isNew);
   const [isSaving, setIsSaving] = useState(false);
   const [isSendingTest, setIsSendingTest] = useState(false);
   const [testEmail, setTestEmail] = useState("");
@@ -36,6 +37,8 @@ export default function TemplateEditorPage() {
   const [hasChanges, setHasChanges] = useState(false);
 
   useEffect(() => {
+    if (isNew) return;
+
     fetch(`/api/templates/${id}`)
       .then((res) => {
         if (!res.ok) throw new Error("Not found");
@@ -49,16 +52,20 @@ export default function TemplateEditorPage() {
       })
       .catch(() => router.push("/templates"))
       .finally(() => setIsLoading(false));
-  }, [id, router]);
+  }, [id, router, isNew]);
 
   useEffect(() => {
+    if (isNew) {
+      setHasChanges(name.trim() !== "" || subject.trim() !== "" || htmlContent.trim() !== "");
+      return;
+    }
     if (!template) return;
     const changed =
       name !== template.name ||
       subject !== template.subject ||
       htmlContent !== template.htmlContent;
     setHasChanges(changed);
-  }, [name, subject, htmlContent, template]);
+  }, [name, subject, htmlContent, template, isNew]);
 
   const handleSave = async () => {
     if (!name.trim() || !subject.trim()) {
@@ -74,21 +81,39 @@ export default function TemplateEditorPage() {
           subject.includes(`{{${v.key}}}`)
       ).map((v) => v.key);
 
-      const res = await fetch(`/api/templates/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name,
-          subject,
-          htmlContent,
-          variables: usedVariables,
-        }),
-      });
+      if (isNew) {
+        const res = await fetch("/api/templates", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name,
+            subject,
+            htmlContent,
+            variables: usedVariables,
+          }),
+        });
 
-      if (res.ok) {
-        const updated = await res.json();
-        setTemplate(updated);
-        setHasChanges(false);
+        if (res.ok) {
+          const created = await res.json();
+          router.push(`/templates/${created.id}`);
+        }
+      } else {
+        const res = await fetch(`/api/templates/${id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name,
+            subject,
+            htmlContent,
+            variables: usedVariables,
+          }),
+        });
+
+        if (res.ok) {
+          const updated = await res.json();
+          setTemplate(updated);
+          setHasChanges(false);
+        }
       }
     } catch (error) {
       console.error("Failed to save:", error);
@@ -177,7 +202,7 @@ export default function TemplateEditorPage() {
     );
   }
 
-  if (!template) {
+  if (!template && !isNew) {
     return (
       <div className="p-6">
         <div className="empty-state py-16">
@@ -206,8 +231,10 @@ export default function TemplateEditorPage() {
             </svg>
           </button>
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">Edit Template</h1>
-            {hasChanges && (
+            <h1 className="text-2xl font-bold text-slate-900">
+              {isNew ? "Create Template" : "Edit Template"}
+            </h1>
+            {hasChanges && !isNew && (
               <span className="inline-flex items-center gap-1.5 text-sm text-amber-600">
                 <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
                 Unsaved changes
@@ -216,18 +243,20 @@ export default function TemplateEditorPage() {
           </div>
         </div>
         <div className="flex gap-3">
-          <button
-            onClick={() => setShowTestModal(true)}
-            className="btn-secondary"
-          >
-            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-            </svg>
-            Send Test
-          </button>
+          {!isNew && (
+            <button
+              onClick={() => setShowTestModal(true)}
+              className="btn-secondary"
+            >
+              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+              </svg>
+              Send Test
+            </button>
+          )}
           <button
             onClick={handleSave}
-            disabled={isSaving || !hasChanges}
+            disabled={isSaving || (!isNew && !hasChanges)}
             className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isSaving ? (
@@ -236,14 +265,14 @@ export default function TemplateEditorPage() {
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                 </svg>
-                Saving...
+                {isNew ? "Creating..." : "Saving..."}
               </>
             ) : (
               <>
                 <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={isNew ? "M12 4v16m8-8H4" : "M5 13l4 4L19 7"} />
                 </svg>
-                Save Changes
+                {isNew ? "Create Template" : "Save Changes"}
               </>
             )}
           </button>

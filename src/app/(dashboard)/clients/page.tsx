@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { ColumnDef } from "@tanstack/react-table";
 import { DataTable } from "@/components/ui/DataTable";
+import { ClientFilters } from "@/components/ui/ClientFilters";
 import type { Client } from "@/db/schema";
 
 interface FiltersData {
@@ -132,6 +133,8 @@ function ClientsPageContent() {
   const category = searchParams.get("category") || "";
   const status = searchParams.get("status") || "";
   const hasEmail = searchParams.get("hasEmail") || "";
+  const sortBy = searchParams.get("sortBy") || "created_at";
+  const sortOrder = searchParams.get("sortOrder") || "desc";
 
   // Update URL params
   const updateParams = useCallback(
@@ -166,6 +169,8 @@ function ClientsPageContent() {
     const params = new URLSearchParams({
       page: page.toString(),
       limit: "200",
+      sortBy,
+      sortOrder,
       ...(search && { search }),
       ...(city && { city }),
       ...(category && { category }),
@@ -185,7 +190,7 @@ function ClientsPageContent() {
       })
       .catch(console.error)
       .finally(() => setIsLoading(false));
-  }, [page, search, city, category, status, hasEmail]);
+  }, [page, search, city, category, status, hasEmail, sortBy, sortOrder]);
 
   // Debounced search
   const [searchInput, setSearchInput] = useState(search);
@@ -338,87 +343,22 @@ function ClientsPageContent() {
 
       {/* Filters */}
       <div className="card p-4 mb-6">
-        <div className="flex flex-wrap gap-3">
-          {/* Search */}
-          <div className="flex-1 min-w-[200px]">
-            <div className="relative">
-              <svg className="w-5 h-5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
-              <input
-                type="text"
-                placeholder="Search by name, email, city..."
-                value={searchInput}
-                onChange={(e) => setSearchInput(e.target.value)}
-                className="input-field pl-10"
-              />
-            </div>
-          </div>
-
-          {/* City Filter */}
-          <select
-            value={city}
-            onChange={(e) => updateParams({ city: e.target.value })}
-            className="select-field"
-          >
-            <option value="">All Cities</option>
-            {filters?.cities.map((c) => (
-              <option key={c.city} value={c.city}>
-                {c.city} ({c.count})
-              </option>
-            ))}
-          </select>
-
-          {/* Category Filter */}
-          <select
-            value={category}
-            onChange={(e) => updateParams({ category: e.target.value })}
-            className="select-field"
-          >
-            <option value="">All Categories</option>
-            {filters?.categories.map((c) => (
-              <option key={c.category} value={c.category}>
-                {c.category} ({c.count})
-              </option>
-            ))}
-          </select>
-
-          {/* Status Filter */}
-          <select
-            value={status}
-            onChange={(e) => updateParams({ status: e.target.value })}
-            className="select-field"
-          >
-            <option value="">All Status</option>
-            <option value="active">Active</option>
-            <option value="inactive">Inactive</option>
-            <option value="bounced">Bounced</option>
-          </select>
-
-          {/* Has Email Filter */}
-          <select
-            value={hasEmail}
-            onChange={(e) => updateParams({ hasEmail: e.target.value })}
-            className="select-field"
-          >
-            <option value="">Email: All</option>
-            <option value="yes">Has Email</option>
-            <option value="no">No Email</option>
-          </select>
-
-          {/* Clear Filters */}
-          {hasActiveFilters && (
-            <button
-              onClick={() => router.push("/clients")}
-              className="btn-ghost"
-            >
-              <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-              Clear
-            </button>
-          )}
-        </div>
+        <ClientFilters
+          filters={filters}
+          activeFilters={{
+            search,
+            city,
+            category,
+            status,
+            hasEmail,
+            sortBy,
+            sortOrder,
+          }}
+          searchInput={searchInput}
+          onSearchChange={setSearchInput}
+          onFilterChange={(key, value) => updateParams({ [key]: value })}
+          onClearAll={() => router.push("/clients")}
+        />
       </div>
 
       {/* Bulk Actions */}
