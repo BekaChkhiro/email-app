@@ -233,62 +233,83 @@ export default function ImportPage() {
     setMapping({});
   };
 
+  const steps = [
+    { key: "upload", label: "Upload", icon: "M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" },
+    { key: "map", label: "Map Columns", icon: "M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" },
+    { key: "preview", label: "Preview", icon: "M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" },
+    { key: "import", label: "Import", icon: "M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" },
+  ];
+
+  const stepsOrder: Step[] = ["upload", "map", "preview", "import"];
+  const currentIdx = stepsOrder.indexOf(step);
+
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
+    <div className="min-h-screen bg-slate-50 py-8">
       <div className="max-w-4xl mx-auto px-4">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-2xl font-bold text-gray-900">Import Clients</h1>
-          <p className="text-gray-600 mt-1">
-            Upload Excel or CSV file to import clients
-          </p>
+          <div className="flex items-center gap-3 mb-2">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-sky-500 to-sky-600 flex items-center justify-center shadow-lg shadow-sky-500/25">
+              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+              </svg>
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-slate-900">Import Clients</h1>
+              <p className="text-slate-500">
+                Upload Excel or CSV file to import clients
+              </p>
+            </div>
+          </div>
         </div>
 
         {/* Step Indicator */}
         <div className="mb-8">
-          <div className="flex items-center justify-between">
-            {[
-              { key: "upload", label: "Upload" },
-              { key: "map", label: "Map Columns" },
-              { key: "preview", label: "Preview" },
-              { key: "import", label: "Import" },
-            ].map((s, idx) => {
-              const steps: Step[] = ["upload", "map", "preview", "import"];
-              const currentIdx = steps.indexOf(step);
-              const stepIdx = steps.indexOf(s.key as Step);
+          <div className="flex items-center justify-between relative">
+            {/* Progress Line Background */}
+            <div className="absolute top-5 left-8 right-8 h-0.5 bg-slate-200" />
+            {/* Progress Line Fill */}
+            <div
+              className="absolute top-5 left-8 h-0.5 bg-gradient-to-r from-sky-500 to-sky-600 transition-all duration-500"
+              style={{ width: `${(currentIdx / (steps.length - 1)) * (100 - 16)}%` }}
+            />
+
+            {steps.map((s, idx) => {
+              const stepIdx = stepsOrder.indexOf(s.key as Step);
               const isActive = stepIdx === currentIdx;
               const isComplete = stepIdx < currentIdx;
 
               return (
-                <div key={s.key} className="flex items-center">
+                <div key={s.key} className="relative z-10 flex flex-col items-center">
                   <div
                     className={`
-                      w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium
+                      w-10 h-10 rounded-xl flex items-center justify-center text-sm font-medium transition-all duration-300
                       ${
                         isComplete
-                          ? "bg-green-500 text-white"
+                          ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/25"
                           : isActive
-                            ? "bg-blue-500 text-white"
-                            : "bg-gray-200 text-gray-500"
+                            ? "bg-gradient-to-br from-sky-500 to-sky-600 text-white shadow-lg shadow-sky-500/25"
+                            : "bg-white border-2 border-slate-200 text-slate-400"
                       }
                     `}
                   >
-                    {isComplete ? "✓" : idx + 1}
+                    {isComplete ? (
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                    ) : (
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d={s.icon} />
+                      </svg>
+                    )}
                   </div>
                   <span
-                    className={`ml-2 text-sm ${
-                      isActive ? "text-blue-600 font-medium" : "text-gray-500"
+                    className={`mt-2 text-sm font-medium transition-colors ${
+                      isActive ? "text-sky-600" : isComplete ? "text-emerald-600" : "text-slate-400"
                     }`}
                   >
                     {s.label}
                   </span>
-                  {idx < 3 && (
-                    <div
-                      className={`w-12 h-0.5 mx-4 ${
-                        isComplete ? "bg-green-500" : "bg-gray-200"
-                      }`}
-                    />
-                  )}
                 </div>
               );
             })}
@@ -296,7 +317,7 @@ export default function ImportPage() {
         </div>
 
         {/* Content Card */}
-        <div className="bg-white rounded-xl shadow-sm border p-6">
+        <div className="card p-6">
           {/* Step: Upload */}
           {step === "upload" && (
             <FileUploader onFileSelect={handleFileSelect} />
@@ -311,18 +332,24 @@ export default function ImportPage() {
                 onMappingChange={handleMappingChange}
                 initialMapping={mapping}
               />
-              <div className="flex gap-3">
+              <div className="flex gap-3 pt-4 border-t border-slate-100">
                 <button
                   onClick={() => setStep("upload")}
-                  className="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                  className="btn-secondary"
                 >
+                  <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  </svg>
                   Back
                 </button>
                 <button
                   onClick={() => setStep("preview")}
-                  className="flex-1 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                  className="btn-primary flex-1"
                 >
                   Continue to Preview
+                  <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
                 </button>
               </div>
             </div>
@@ -338,8 +365,11 @@ export default function ImportPage() {
               />
               <button
                 onClick={() => setStep("map")}
-                className="w-full py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                className="btn-secondary w-full"
               >
+                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
                 Back to Mapping
               </button>
             </div>
