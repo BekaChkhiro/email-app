@@ -22,7 +22,7 @@ export default async function DashboardLayout({
           <div className="flex items-center justify-between h-16">
             {/* Logo & Links */}
             <div className="flex items-center gap-8">
-              <Link href="/" className="flex items-center gap-2.5 group">
+              <Link href="/clients" className="flex items-center gap-2.5 group">
                 <div className="w-9 h-9 bg-gradient-to-br from-sky-400 to-sky-600 rounded-xl flex items-center justify-center shadow-lg shadow-sky-500/30 group-hover:shadow-sky-500/50 transition-shadow">
                   <svg
                     className="w-5 h-5 text-white"

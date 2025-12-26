@@ -29,7 +29,7 @@ export const authConfig: NextAuthConfig = {
       // Protect dashboard routes
       if (isOnDashboard) {
         if (isLoggedIn) return true;
-        return false; // Redirect to login
+        return Response.redirect(new URL("/login", nextUrl));
       }
 
       // Already on login page
