@@ -7,7 +7,7 @@ import { FileUploader } from "@/components/import/FileUploader";
 import { ColumnMapper, type ColumnMapping } from "@/components/import/ColumnMapper";
 import { ImportPreview } from "@/components/import/ImportPreview";
 import { ImportProgress, type ImportStats } from "@/components/import/ImportProgress";
-import { parseAddress } from "@/lib/utils";
+import { parse08geAddress } from "@/lib/utils";
 
 type Step = "upload" | "map" | "preview" | "import" | "complete";
 
@@ -34,6 +34,17 @@ export default function ImportPage() {
 
   const cancelRef = useRef(false);
 
+  // Check if CSV is headerless 08.ge format (first column is row number)
+  const is08geHeaderlessFormat = (rows: string[][]): boolean => {
+    if (rows.length < 3) return false;
+    // Check if first column of first 5 rows are sequential numbers starting from 1
+    for (let i = 0; i < Math.min(5, rows.length); i++) {
+      const firstCell = rows[i][0]?.toString().replace(/^\uFEFF/, '').trim(); // Remove BOM
+      if (parseInt(firstCell) !== i + 1) return false;
+    }
+    return true;
+  };
+
   // Parse file and extract data
   const parseFile = async (file: File): Promise<Record<string, string>[]> => {
     return new Promise((resolve, reject) => {
@@ -44,12 +55,37 @@ export default function ImportPage() {
           const data = e.target?.result;
 
           if (file.name.endsWith(".csv")) {
-            // Parse CSV
+            // First parse without headers to check format
             Papa.parse(data as string, {
-              header: true,
+              header: false,
               skipEmptyLines: true,
               complete: (results) => {
-                resolve(results.data as Record<string, string>[]);
+                const rows = results.data as string[][];
+
+                // Check if this is a headerless 08.ge format
+                if (is08geHeaderlessFormat(rows)) {
+                  // Convert to objects with numbered column names
+                  const convertedData = rows.map((row) => {
+                    const obj: Record<string, string> = {};
+                    row.forEach((cell, index) => {
+                      obj[String(index + 1)] = cell?.toString().trim() || "";
+                    });
+                    return obj;
+                  });
+                  resolve(convertedData);
+                } else {
+                  // Re-parse with headers for normal CSVs
+                  Papa.parse(data as string, {
+                    header: true,
+                    skipEmptyLines: true,
+                    complete: (headerResults) => {
+                      resolve(headerResults.data as Record<string, string>[]);
+                    },
+                    error: (err: Error) => {
+                      reject(err);
+                    },
+                  });
+                }
               },
               error: (err: Error) => {
                 reject(err);
@@ -118,12 +154,11 @@ export default function ImportPage() {
 
       const value = row[column] || null;
 
-      // Special handling for address field - parse category and city
+      // Special handling for address field - parse city from 08.ge format
       if (field === "address" && value) {
-        const { category, city, fullAddress } = parseAddress(value);
-        result["category"] = category;
+        const { city, address } = parse08geAddress(value);
         result["city"] = city;
-        result["address"] = fullAddress;
+        result["address"] = address;
         return;
       }
 

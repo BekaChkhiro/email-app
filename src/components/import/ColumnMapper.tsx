@@ -2,25 +2,25 @@
 
 import { useState, useEffect } from "react";
 
-// Database fields available for mapping
+// Database fields available for mapping (ordered to match 08.ge CSV structure)
 export const DB_FIELDS = [
-  { key: "company_name", label: "Company Name", required: false },
-  { key: "category", label: "Category", required: false },
-  { key: "city", label: "City", required: false },
-  { key: "address", label: "Address", required: false },
-  { key: "identification_code", label: "Identification Code", required: false },
-  { key: "phone_primary", label: "Phone (Primary)", required: false },
-  { key: "phone_secondary", label: "Phone (Secondary)", required: false },
-  { key: "phone_tertiary", label: "Phone (Tertiary)", required: false },
+  { key: "_skip", label: "-- გამოტოვება --", required: false },
+  { key: "company_name", label: "კომპანიის სახელი", required: false },
+  { key: "address", label: "მისამართი", required: false },
+  { key: "identification_code", label: "საიდენტიფიკაციო კოდი", required: false },
+  { key: "phone_primary", label: "ტელეფონი (ძირითადი)", required: false },
   { key: "email", label: "Email", required: true },
-  { key: "email_secondary", label: "Email (Secondary)", required: false },
-  { key: "website", label: "Website", required: false },
+  { key: "website", label: "ვებსაიტი", required: false },
   { key: "facebook", label: "Facebook", required: false },
-  { key: "director_name", label: "Director Name", required: false },
-  { key: "legal_form", label: "Legal Form", required: false },
-  { key: "company_name_alt", label: "Company Name (Alt)", required: false },
-  { key: "link_08", label: "08 Link", required: false },
-  { key: "_skip", label: "-- Skip this column --", required: false },
+  { key: "category", label: "კატეგორია", required: false },
+  { key: "director_name", label: "საკონტაქტო პირი", required: false },
+  { key: "legal_form", label: "სამართლებრივი ფორმა", required: false },
+  { key: "company_name_alt", label: "სრული სახელი", required: false },
+  { key: "phone_secondary", label: "ტელეფონი (დამატებითი)", required: false },
+  { key: "link_08", label: "08.ge ლინკი", required: false },
+  { key: "city", label: "ქალაქი", required: false },
+  { key: "phone_tertiary", label: "ტელეფონი (მესამე)", required: false },
+  { key: "email_secondary", label: "Email (დამატებითი)", required: false },
 ] as const;
 
 export type DBFieldKey = (typeof DB_FIELDS)[number]["key"];
@@ -42,6 +42,24 @@ function is08geFormat(columns: string[]): boolean {
   const numericColumns = columns.filter((col) => /^\d+$/.test(col.trim()));
   return numericColumns.length >= columns.length * 0.8; // 80% threshold
 }
+
+// 08.ge CSV column descriptions for display
+const COLUMN_08GE_LABELS: Record<string, string> = {
+  "1": "ID - რიგითი ნომერი",
+  "2": "კომპანიის სახელი",
+  "3": "მისამართი",
+  "4": "საიდენტიფიკაციო კოდი",
+  "5": "ტელეფონი (ძირითადი)",
+  "6": "Email",
+  "7": "ვებსაიტი",
+  "8": "Facebook",
+  "9": "კატეგორია",
+  "10": "საკონტაქტო პირი",
+  "11": "სამართლებრივი ფორმა",
+  "12": "სრული სახელი",
+  "13": "ტელეფონი (დამატებითი)",
+  "14": "08.ge ლინკი",
+};
 
 // Get predefined mapping for 08.ge CSV format
 function get08geMapping(columns: string[]): ColumnMapping {
@@ -75,6 +93,23 @@ function get08geMapping(columns: string[]): ColumnMapping {
   });
 
   return mapping;
+}
+
+// Sort columns numerically if they are all numbers
+function sortColumnsNumerically(columns: string[]): string[] {
+  const allNumeric = columns.every((col) => /^\d+$/.test(col.trim()));
+  if (allNumeric) {
+    return [...columns].sort((a, b) => parseInt(a) - parseInt(b));
+  }
+  return columns;
+}
+
+// Get display label for column (with 08.ge description if applicable)
+function getColumnDisplayLabel(column: string, is08ge: boolean): string {
+  if (is08ge && COLUMN_08GE_LABELS[column.trim()]) {
+    return `${column} - ${COLUMN_08GE_LABELS[column.trim()]}`;
+  }
+  return column;
 }
 
 // Auto-detect mapping based on column names
@@ -163,6 +198,10 @@ export function ColumnMapper({
   onMappingChange,
   initialMapping,
 }: ColumnMapperProps) {
+  // Check if this is 08.ge format and sort columns accordingly
+  const is08ge = is08geFormat(columns);
+  const sortedColumns = sortColumnsNumerically(columns);
+
   const [mapping, setMapping] = useState<ColumnMapping>(() => {
     // Try to load from localStorage
     if (typeof window !== "undefined") {
@@ -242,25 +281,54 @@ export function ColumnMapper({
         </div>
       )}
 
+      {is08ge && (
+        <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+          <p className="text-sm text-blue-700">
+            08.ge ფორმატი აღმოჩენილია - სვეტები ავტომატურად დამეპდა
+          </p>
+        </div>
+      )}
+
       <div className="overflow-x-auto">
         <table className="w-full border-collapse">
           <thead>
             <tr className="bg-gray-50">
-              <th className="p-3 text-left text-sm font-medium text-gray-600 border">
-                Excel Column
+              <th className="p-3 text-left text-sm font-medium text-gray-600 border w-16">
+                #
               </th>
               <th className="p-3 text-left text-sm font-medium text-gray-600 border">
+                {is08ge ? "CSV სვეტი (08.ge)" : "Excel Column"}
+              </th>
+              <th className="p-3 text-left text-sm font-medium text-gray-600 border w-48">
                 Map to Field
               </th>
               <th className="p-3 text-left text-sm font-medium text-gray-600 border">
-                Preview (First 3 rows)
+                Preview
               </th>
             </tr>
           </thead>
           <tbody>
-            {columns.map((column) => (
+            {sortedColumns.map((column, index) => (
               <tr key={column} className="hover:bg-gray-50">
-                <td className="p-3 border font-mono text-sm">{column}</td>
+                <td className="p-3 border text-center text-sm text-gray-500">
+                  {index + 1}
+                </td>
+                <td className="p-3 border">
+                  <div className="text-sm">
+                    {is08ge ? (
+                      <div>
+                        <span className="font-mono font-medium text-blue-600">{column}</span>
+                        {COLUMN_08GE_LABELS[column.trim()] && (
+                          <span className="ml-2 text-gray-500">
+                            {COLUMN_08GE_LABELS[column.trim()]}
+                          </span>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="font-mono">{column}</span>
+                    )}
+                  </div>
+                </td>
                 <td className="p-3 border">
                   <select
                     value={mapping[column] || "_skip"}
@@ -272,7 +340,7 @@ export function ColumnMapper({
                         ? "border-green-500 bg-green-50"
                         : mapping[column] === "_skip"
                           ? "border-gray-200 text-gray-400"
-                          : "border-gray-300"
+                          : "border-blue-300 bg-blue-50"
                     }`}
                   >
                     {DB_FIELDS.map((field) => (
@@ -285,7 +353,7 @@ export function ColumnMapper({
                 </td>
                 <td className="p-3 border">
                   <div className="space-y-1">
-                    {previewData.slice(0, 3).map((row, idx) => (
+                    {previewData.slice(0, 2).map((row, idx) => (
                       <div
                         key={idx}
                         className="text-xs text-gray-600 truncate max-w-xs"
