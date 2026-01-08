@@ -158,9 +158,19 @@ function ClientsPageContent() {
   // Fetch filters
   useEffect(() => {
     fetch("/api/clients/filters")
-      .then((res) => res.json())
-      .then(setFilters)
-      .catch(console.error);
+      .then((res) => {
+        if (!res.ok) {
+          throw new Error(`Filters API error: ${res.status}`);
+        }
+        return res.json();
+      })
+      .then((data) => {
+        console.log("Filters loaded:", data);
+        setFilters(data);
+      })
+      .catch((err) => {
+        console.error("Failed to load filters:", err);
+      });
   }, []);
 
   // Fetch clients
