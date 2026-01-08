@@ -36,8 +36,54 @@ interface ColumnMapperProps {
   initialMapping?: ColumnMapping;
 }
 
+// Detect if columns are from 08.ge format (numbered columns like "1", "2", "3"...)
+function is08geFormat(columns: string[]): boolean {
+  // Check if all columns are numbers or mostly numbers
+  const numericColumns = columns.filter((col) => /^\d+$/.test(col.trim()));
+  return numericColumns.length >= columns.length * 0.8; // 80% threshold
+}
+
+// Get predefined mapping for 08.ge CSV format
+function get08geMapping(columns: string[]): ColumnMapping {
+  const mapping: ColumnMapping = {};
+
+  // 08.ge CSV column positions (0-indexed internally, but columns are "1", "2", etc.)
+  const positionMap: Record<string, DBFieldKey> = {
+    "1": "_skip", // ID - row number
+    "2": "company_name", // Company name | 08.GE
+    "3": "address", // Address (includes city)
+    "4": "identification_code", // Identification code
+    "5": "phone_primary", // Phone 1
+    "6": "email", // Email
+    "7": "website", // Website
+    "8": "facebook", // Facebook
+    "9": "category", // Category
+    "10": "director_name", // Director/Contact name
+    "11": "legal_form", // Legal form (შ.პ.ს, ი.მ, etc.)
+    "12": "company_name_alt", // Full company name
+    "13": "phone_secondary", // Phone 2
+    "14": "link_08", // 08.ge link
+  };
+
+  columns.forEach((col) => {
+    const trimmed = col.trim();
+    if (positionMap[trimmed]) {
+      mapping[col] = positionMap[trimmed];
+    } else {
+      mapping[col] = "_skip";
+    }
+  });
+
+  return mapping;
+}
+
 // Auto-detect mapping based on column names
 function autoDetectMapping(columns: string[]): ColumnMapping {
+  // First check if this is 08.ge format (numbered columns)
+  if (is08geFormat(columns)) {
+    return get08geMapping(columns);
+  }
+
   const mapping: ColumnMapping = {};
 
   const patterns: { pattern: RegExp; field: DBFieldKey }[] = [

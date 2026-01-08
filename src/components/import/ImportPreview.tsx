@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { isValidEmail } from "@/lib/utils";
+import { isValidEmail, isValidGeorgianPhone } from "@/lib/utils";
 import type { ColumnMapping } from "./ColumnMapper";
 
 interface ImportPreviewProps {
@@ -17,6 +17,10 @@ interface ValidationStats {
   invalidEmails: number;
   duplicateEmails: number;
   uniqueEmails: Set<string>;
+  // 08.ge cleaning stats
+  companyNamesToClean: number;
+  addressesToParse: number;
+  invalidPhones: number;
 }
 
 export function ImportPreview({
@@ -28,6 +32,18 @@ export function ImportPreview({
     const emailColumn = Object.entries(mapping).find(
       ([, value]) => value === "email"
     )?.[0];
+    const companyNameColumn = Object.entries(mapping).find(
+      ([, value]) => value === "company_name"
+    )?.[0];
+    const addressColumn = Object.entries(mapping).find(
+      ([, value]) => value === "address"
+    )?.[0];
+    const phonePrimaryColumn = Object.entries(mapping).find(
+      ([, value]) => value === "phone_primary"
+    )?.[0];
+    const phoneSecondaryColumn = Object.entries(mapping).find(
+      ([, value]) => value === "phone_secondary"
+    )?.[0];
 
     const uniqueEmails = new Set<string>();
     let rowsWithEmail = 0;
@@ -35,27 +51,57 @@ export function ImportPreview({
     let invalidEmails = 0;
     let duplicateEmails = 0;
 
+    // 08.ge cleaning stats
+    let companyNamesToClean = 0;
+    let addressesToParse = 0;
+    let invalidPhones = 0;
+
     data.forEach((row) => {
       const email = emailColumn ? row[emailColumn]?.trim().toLowerCase() : null;
 
       if (!email) {
         rowsWithoutEmail++;
-        return;
-      }
-
-      if (!isValidEmail(email)) {
+      } else if (!isValidEmail(email)) {
         invalidEmails++;
         rowsWithoutEmail++;
-        return;
-      }
-
-      if (uniqueEmails.has(email)) {
-        duplicateEmails++;
       } else {
-        uniqueEmails.add(email);
+        if (uniqueEmails.has(email)) {
+          duplicateEmails++;
+        } else {
+          uniqueEmails.add(email);
+        }
+        rowsWithEmail++;
       }
 
-      rowsWithEmail++;
+      // Check for company names with "| 08.GE" suffix
+      if (companyNameColumn) {
+        const companyName = row[companyNameColumn];
+        if (companyName && /\|\s*08\.GE/i.test(companyName)) {
+          companyNamesToClean++;
+        }
+      }
+
+      // Check for addresses that can be parsed (contain " / ")
+      if (addressColumn) {
+        const address = row[addressColumn];
+        if (address && address.includes(" / ")) {
+          addressesToParse++;
+        }
+      }
+
+      // Check for invalid phone numbers
+      if (phonePrimaryColumn) {
+        const phone = row[phonePrimaryColumn];
+        if (phone && !isValidGeorgianPhone(phone)) {
+          invalidPhones++;
+        }
+      }
+      if (phoneSecondaryColumn) {
+        const phone = row[phoneSecondaryColumn];
+        if (phone && !isValidGeorgianPhone(phone)) {
+          invalidPhones++;
+        }
+      }
     });
 
     return {
@@ -65,6 +111,9 @@ export function ImportPreview({
       invalidEmails,
       duplicateEmails,
       uniqueEmails,
+      companyNamesToClean,
+      addressesToParse,
+      invalidPhones,
     };
   }, [data, mapping]);
 
@@ -139,6 +188,42 @@ export function ImportPreview({
           </div>
         </div>
       </div>
+
+      {/* 08.ge Data Cleaning Summary */}
+      {(stats.companyNamesToClean > 0 || stats.addressesToParse > 0 || stats.invalidPhones > 0) && (
+        <div className="bg-blue-50 rounded-lg p-4 space-y-3">
+          <h4 className="font-medium text-blue-800">Data Cleaning (08.ge Format)</h4>
+
+          <div className="space-y-2 text-sm">
+            {stats.companyNamesToClean > 0 && (
+              <div className="flex items-center gap-2 text-blue-700">
+                <CleanIcon />
+                <span>
+                  {stats.companyNamesToClean.toLocaleString()} company names will be cleaned (&quot;| 08.GE&quot; removed)
+                </span>
+              </div>
+            )}
+
+            {stats.addressesToParse > 0 && (
+              <div className="flex items-center gap-2 text-blue-700">
+                <CleanIcon />
+                <span>
+                  {stats.addressesToParse.toLocaleString()} addresses will be parsed (city extracted)
+                </span>
+              </div>
+            )}
+
+            {stats.invalidPhones > 0 && (
+              <div className="flex items-center gap-2 text-yellow-700">
+                <WarningIcon />
+                <span>
+                  {stats.invalidPhones.toLocaleString()} invalid phone numbers will be filtered out
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Import Estimation */}
       <div className="bg-blue-50 rounded-lg p-4">
@@ -228,6 +313,18 @@ function CheckIcon() {
       <path
         fillRule="evenodd"
         d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+        clipRule="evenodd"
+      />
+    </svg>
+  );
+}
+
+function CleanIcon() {
+  return (
+    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+      <path
+        fillRule="evenodd"
+        d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z"
         clipRule="evenodd"
       />
     </svg>

@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { clients } from "@/db/schema";
+import {
+  cleanCompanyName,
+  parse08geAddress,
+  isValidGeorgianPhone,
+  cleanIdentificationCode,
+  normalizePhone,
+} from "@/lib/utils";
 
 interface ClientImportData {
   company_name?: string | null;
@@ -57,23 +64,35 @@ function normalizeClient(data: ClientImportData): {
     }
   }
 
-  // Normalize phone numbers (remove spaces, dashes)
-  const normalizePhone = (phone: string | null | undefined): string | null => {
+  // Clean company name (remove "| 08.GE" suffix)
+  const companyName = cleanCompanyName(data.company_name);
+
+  // Parse 08.ge address format and extract city
+  const addressParts = parse08geAddress(data.address);
+  // Use parsed city if available, otherwise use provided city
+  const city = addressParts.city || data.city?.trim() || null;
+  const address = addressParts.address || data.address?.trim() || null;
+
+  // Validate and normalize phone numbers (filter out invalid Georgian phones)
+  const processPhone = (phone: string | null | undefined): string | null => {
     if (!phone) return null;
-    const cleaned = phone.toString().replace(/[\s\-\(\)]/g, "").trim();
-    return cleaned || null;
+    if (!isValidGeorgianPhone(phone)) return null;
+    return normalizePhone(phone);
   };
+
+  // Clean identification code
+  const identificationCode = cleanIdentificationCode(data.identification_code);
 
   // Create the client object
   const client: typeof clients.$inferInsert = {
-    companyName: data.company_name?.trim() || null,
+    companyName: companyName,
     category: data.category?.trim() || null,
-    city: data.city?.trim() || null,
-    address: data.address?.trim() || null,
-    identificationCode: data.identification_code?.toString().trim() || null,
-    phonePrimary: normalizePhone(data.phone_primary),
-    phoneSecondary: normalizePhone(data.phone_secondary),
-    phoneTertiary: normalizePhone(data.phone_tertiary),
+    city: city,
+    address: address,
+    identificationCode: identificationCode,
+    phonePrimary: processPhone(data.phone_primary),
+    phoneSecondary: processPhone(data.phone_secondary),
+    phoneTertiary: processPhone(data.phone_tertiary),
     email: email,
     emailSecondary: emailSecondary,
     website: data.website?.trim() || null,
