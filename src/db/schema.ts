@@ -148,6 +148,29 @@ export const emailHistory = pgTable(
 );
 
 // =====================
+// CAMPAIGN LOGS TABLE
+// =====================
+export const campaignLogs = pgTable(
+  "campaign_logs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    campaignId: uuid("campaign_id")
+      .references(() => campaigns.id, { onDelete: "cascade" })
+      .notNull(),
+    level: varchar("level", { length: 20 }).notNull(), // info, success, warning, error
+    event: varchar("event", { length: 50 }).notNull(),
+    message: text("message").notNull(),
+    metadata: text("metadata"), // JSON string for extra data
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("idx_campaign_logs_campaign").on(table.campaignId),
+    index("idx_campaign_logs_created_at").on(table.createdAt),
+    index("idx_campaign_logs_campaign_created").on(table.campaignId, table.createdAt),
+  ]
+);
+
+// =====================
 // CLIENT NOTES TABLE
 // =====================
 export const clientNotes = pgTable("client_notes", {
@@ -181,6 +204,7 @@ export const campaignsRelations = relations(campaigns, ({ one, many }) => ({
   }),
   recipients: many(campaignRecipients),
   emailHistory: many(emailHistory),
+  logs: many(campaignLogs),
 }));
 
 export const campaignRecipientsRelations = relations(
@@ -219,6 +243,13 @@ export const clientNotesRelations = relations(clientNotes, ({ one }) => ({
   }),
 }));
 
+export const campaignLogsRelations = relations(campaignLogs, ({ one }) => ({
+  campaign: one(campaigns, {
+    fields: [campaignLogs.campaignId],
+    references: [campaigns.id],
+  }),
+}));
+
 // =====================
 // TYPE EXPORTS
 // =====================
@@ -242,3 +273,6 @@ export type NewEmailHistoryRecord = typeof emailHistory.$inferInsert;
 
 export type ClientNote = typeof clientNotes.$inferSelect;
 export type NewClientNote = typeof clientNotes.$inferInsert;
+
+export type CampaignLog = typeof campaignLogs.$inferSelect;
+export type NewCampaignLog = typeof campaignLogs.$inferInsert;

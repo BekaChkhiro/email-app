@@ -8,6 +8,7 @@ import {
 } from "@/db/schema";
 import { eq, and, sql, gte } from "drizzle-orm";
 import { sendEmail, isResendConfigured } from "./resend";
+import { campaignLogger } from "./campaign-logger";
 import type { Client } from "@/db/schema";
 
 // Constants
@@ -103,8 +104,9 @@ async function getPendingRecipients(
 
 /**
  * Update campaign statistics
+ * Returns true if campaign was completed
  */
-async function updateCampaignStats(campaignId: string): Promise<void> {
+async function updateCampaignStats(campaignId: string): Promise<boolean> {
   // Get sent count
   const sentResult = await db
     .select({ count: sql<number>`count(*)::int` })
@@ -145,7 +147,9 @@ async function updateCampaignStats(campaignId: string): Promise<void> {
         completedAt: new Date(),
       })
       .where(eq(campaigns.id, campaignId));
+    return true;
   }
+  return false;
 }
 
 /**
@@ -206,12 +210,16 @@ export async function processEmailQueue(): Promise<QueueResult> {
       };
 
       // Check sending hours
-      if (
-        !isWithinSendingHours(
-          campaign.sendStartHour || 9,
-          campaign.sendEndHour || 18
-        )
-      ) {
+      const startHour = campaign.sendStartHour || 9;
+      const endHour = campaign.sendEndHour || 18;
+      if (!isWithinSendingHours(startHour, endHour)) {
+        const currentHour = new Date().getHours();
+        await campaignLogger.warning(
+          campaign.id,
+          "outside_sending_hours",
+          `Outside sending hours (current: ${currentHour}:00, window: ${startHour}:00-${endHour}:00)`,
+          { currentHour, sendWindow: `${startHour}:00-${endHour}:00` }
+        );
         campaignResult.sent = 0;
         result.campaigns.push(campaignResult);
         continue;
@@ -222,6 +230,12 @@ export async function processEmailQueue(): Promise<QueueResult> {
       const dailyLimit = campaign.dailyLimit || 10;
 
       if (dailySent >= dailyLimit) {
+        await campaignLogger.warning(
+          campaign.id,
+          "daily_limit_reached",
+          `Daily limit reached (${dailySent}/${dailyLimit} sent today)`,
+          { sentToday: dailySent, dailyLimit }
+        );
         result.campaigns.push(campaignResult);
         continue;
       }
@@ -237,6 +251,11 @@ export async function processEmailQueue(): Promise<QueueResult> {
       );
 
       if (pendingRecipients.length === 0) {
+        await campaignLogger.info(
+          campaign.id,
+          "no_pending_recipients",
+          "No pending recipients to process"
+        );
         result.campaigns.push(campaignResult);
         continue;
       }
@@ -254,6 +273,12 @@ export async function processEmailQueue(): Promise<QueueResult> {
               errorMessage: "No email address",
             })
             .where(eq(campaignRecipients.id, recipientId));
+          await campaignLogger.warning(
+            campaign.id,
+            "recipient_no_email",
+            `Skipped: No email address for "${client.companyName || "Unknown"}"`,
+            { recipientCompany: client.companyName || "Unknown" }
+          );
           continue;
         }
 
@@ -264,6 +289,14 @@ export async function processEmailQueue(): Promise<QueueResult> {
         const htmlContent = template
           ? personalize(template.htmlContent, client)
           : "<p>Message content</p>";
+
+        // Log sending attempt
+        await campaignLogger.info(
+          campaign.id,
+          "email_sending",
+          `Sending email to ${client.email}...`,
+          { recipientEmail: client.email, recipientCompany: client.companyName || "Unknown", subject }
+        );
 
         // Send email
         const sendResult = await sendEmail({
@@ -294,6 +327,13 @@ export async function processEmailQueue(): Promise<QueueResult> {
             sentAt: new Date(),
           });
 
+          await campaignLogger.success(
+            campaign.id,
+            "email_sent",
+            `Email sent successfully to ${client.email}`,
+            { recipientEmail: client.email, recipientCompany: client.companyName || "Unknown", messageId: sendResult.messageId }
+          );
+
           campaignResult.sent++;
           result.processed++;
         } else {
@@ -305,6 +345,13 @@ export async function processEmailQueue(): Promise<QueueResult> {
               errorMessage: sendResult.error,
             })
             .where(eq(campaignRecipients.id, recipientId));
+
+          await campaignLogger.error(
+            campaign.id,
+            "email_failed",
+            `Failed to send email to ${client.email}: ${sendResult.error}`,
+            { recipientEmail: client.email, recipientCompany: client.companyName || "Unknown", errorMessage: sendResult.error }
+          );
 
           campaignResult.failed++;
           result.errors++;
@@ -318,7 +365,15 @@ export async function processEmailQueue(): Promise<QueueResult> {
       }
 
       // Update campaign stats
-      await updateCampaignStats(campaign.id);
+      const isCompleted = await updateCampaignStats(campaign.id);
+      if (isCompleted) {
+        await campaignLogger.success(
+          campaign.id,
+          "campaign_completed",
+          "Campaign completed! All emails have been sent.",
+          { totalSent: campaignResult.sent }
+        );
+      }
 
       result.campaigns.push(campaignResult);
     }

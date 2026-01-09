@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
+import { CampaignConsole } from "@/components/campaigns";
 
 interface CampaignDetail {
   id: string;
@@ -39,16 +40,26 @@ interface RecentActivity {
   sentAt: string;
 }
 
+interface LogEntry {
+  id: string;
+  level: "info" | "success" | "warning" | "error";
+  event: string;
+  message: string;
+  metadata: Record<string, unknown> | null;
+  createdAt: string;
+}
+
 export default function CampaignDetailPage() {
   const params = useParams();
   const id = params.id as string;
   const router = useRouter();
   const [campaign, setCampaign] = useState<CampaignDetail | null>(null);
   const [recentActivity, setRecentActivity] = useState<RecentActivity[]>([]);
+  const [logs, setLogs] = useState<LogEntry[]>([]);
   const [todaySentCount, setTodaySentCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [isUpdating, setIsUpdating] = useState(false);
-  const [activeTab, setActiveTab] = useState<"recipients" | "activity">("recipients");
+  const [activeTab, setActiveTab] = useState<"recipients" | "activity" | "logs">("recipients");
 
   // Fetch campaign data
   const fetchCampaign = useCallback(async () => {
@@ -76,24 +87,38 @@ export default function CampaignDetailPage() {
     }
   }, [id]);
 
+  // Fetch logs
+  const fetchLogs = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/campaigns/${id}/logs`);
+      if (res.ok) {
+        const data = await res.json();
+        setLogs(data.logs || []);
+      }
+    } catch (error) {
+      console.error("Failed to fetch logs:", error);
+    }
+  }, [id]);
+
   // Initial load
   useEffect(() => {
-    Promise.all([fetchCampaign(), fetchActivity()]).finally(() =>
+    Promise.all([fetchCampaign(), fetchActivity(), fetchLogs()]).finally(() =>
       setIsLoading(false)
     );
-  }, [fetchCampaign, fetchActivity]);
+  }, [fetchCampaign, fetchActivity, fetchLogs]);
 
-  // Polling for real-time updates (every 30 seconds when campaign is active)
+  // Polling for real-time updates (every 5 seconds when campaign is active)
   useEffect(() => {
     if (campaign?.status !== "active") return;
 
     const interval = setInterval(() => {
       fetchCampaign();
       fetchActivity();
-    }, 30000);
+      fetchLogs();
+    }, 5000);
 
     return () => clearInterval(interval);
-  }, [campaign?.status, fetchCampaign, fetchActivity]);
+  }, [campaign?.status, fetchCampaign, fetchActivity, fetchLogs]);
 
   const handleAction = async (action: "launch" | "pause" | "resume" | "stop") => {
     setIsUpdating(true);
@@ -426,9 +451,22 @@ export default function CampaignDetailPage() {
                   <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-sky-500 to-sky-600" />
                 )}
               </button>
+              <button
+                onClick={() => setActiveTab("logs")}
+                className={`flex-1 px-4 py-3.5 text-sm font-medium transition-colors relative ${
+                  activeTab === "logs"
+                    ? "text-sky-600"
+                    : "text-slate-500 hover:text-slate-700"
+                }`}
+              >
+                Console
+                {activeTab === "logs" && (
+                  <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-sky-500 to-sky-600" />
+                )}
+              </button>
             </div>
 
-            {activeTab === "recipients" ? (
+            {activeTab === "recipients" && (
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead className="table-header">
@@ -469,7 +507,9 @@ export default function CampaignDetailPage() {
                   </tbody>
                 </table>
               </div>
-            ) : (
+            )}
+
+            {activeTab === "activity" && (
               <div className="p-4 space-y-3">
                 {recentActivity.length === 0 ? (
                   <div className="empty-state py-12">
@@ -505,6 +545,12 @@ export default function CampaignDetailPage() {
                     </div>
                   ))
                 )}
+              </div>
+            )}
+
+            {activeTab === "logs" && (
+              <div className="p-4">
+                <CampaignConsole logs={logs} isLoading={isLoading} />
               </div>
             )}
           </div>
