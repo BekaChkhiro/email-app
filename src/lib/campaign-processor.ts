@@ -6,7 +6,7 @@ import {
   emailTemplates,
   emailHistory,
 } from "@/db/schema";
-import { eq, and, sql, gte } from "drizzle-orm";
+import { eq, and, sql, gte, desc } from "drizzle-orm";
 import { sendEmail, isResendConfigured } from "./resend";
 import { campaignLogger } from "./campaign-logger";
 import { personalize } from "./queue";
@@ -15,10 +15,9 @@ import type { Client } from "@/db/schema";
 // Store active processor intervals
 const activeProcessors = new Map<string, NodeJS.Timeout>();
 
-// Constants - shorter delays for better UX
-const MIN_DELAY_MS = 30 * 1000; // 30 seconds
-const MAX_DELAY_MS = 60 * 1000; // 60 seconds
-const PROCESSOR_INTERVAL_MS = 30 * 1000; // Check every 30 seconds
+// Check every minute for scheduled sends
+const PROCESSOR_INTERVAL_MS = 60 * 1000; // Check every 60 seconds
+const MIN_INTERVAL_MINUTES = 5; // Minimum 5 minutes between emails
 
 /**
  * Get current hour in local timezone (Georgia/Tbilisi UTC+4)
@@ -36,6 +35,61 @@ function getLocalHour(): number {
 function isWithinSendingHours(startHour: number, endHour: number): boolean {
   const currentHour = getLocalHour();
   return currentHour >= startHour && currentHour < endHour;
+}
+
+/**
+ * Get current time in Georgia timezone
+ */
+function getLocalTime(): Date {
+  const now = new Date();
+  return new Date(now.toLocaleString("en-US", { timeZone: "Asia/Tbilisi" }));
+}
+
+/**
+ * Calculate interval between emails based on daily limit and send window
+ * Returns interval in milliseconds
+ */
+function calculateEmailInterval(dailyLimit: number, startHour: number, endHour: number): number {
+  const windowHours = endHour - startHour;
+  const windowMinutes = windowHours * 60;
+
+  // Calculate minutes between each email
+  let intervalMinutes = windowMinutes / dailyLimit;
+
+  // Ensure minimum interval
+  if (intervalMinutes < MIN_INTERVAL_MINUTES) {
+    intervalMinutes = MIN_INTERVAL_MINUTES;
+  }
+
+  // Add some randomization (±10%)
+  const variance = intervalMinutes * 0.1;
+  const randomOffset = (Math.random() * variance * 2) - variance;
+  intervalMinutes += randomOffset;
+
+  return Math.round(intervalMinutes * 60 * 1000); // Convert to milliseconds
+}
+
+/**
+ * Get the last sent email time for a campaign today
+ */
+async function getLastSentTime(campaignId: string): Promise<Date | null> {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const result = await db
+    .select({ sentAt: campaignRecipients.sentAt })
+    .from(campaignRecipients)
+    .where(
+      and(
+        eq(campaignRecipients.campaignId, campaignId),
+        eq(campaignRecipients.status, "sent"),
+        gte(campaignRecipients.sentAt, today)
+      )
+    )
+    .orderBy(desc(campaignRecipients.sentAt))
+    .limit(1);
+
+  return result[0]?.sentAt || null;
 }
 
 /**
@@ -137,17 +191,19 @@ async function updateCampaignStats(campaignId: string): Promise<boolean> {
 }
 
 /**
- * Random delay between emails
+ * Format milliseconds to human readable time
  */
-function randomDelay(minMs: number, maxMs: number): number {
-  return Math.floor(Math.random() * (maxMs - minMs + 1)) + minMs;
-}
-
-/**
- * Sleep for specified milliseconds
- */
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+function formatDuration(ms: number): string {
+  const minutes = Math.floor(ms / 60000);
+  if (minutes < 60) {
+    return `${minutes} წუთში`;
+  }
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+  if (remainingMinutes === 0) {
+    return `${hours} საათში`;
+  }
+  return `${hours} სთ ${remainingMinutes} წთ-ში`;
 }
 
 /**
@@ -207,6 +263,36 @@ async function processCampaignBatch(campaignId: string): Promise<void> {
         { sentToday: dailySent, dailyLimit }
       );
       return;
+    }
+
+    // Calculate interval based on daily limit and send window
+    const emailInterval = calculateEmailInterval(dailyLimit, startHour, endHour);
+    const intervalMinutes = Math.round(emailInterval / 60000);
+
+    // Check if enough time has passed since last email
+    const lastSentTime = await getLastSentTime(campaignId);
+    if (lastSentTime) {
+      const now = new Date();
+      const timeSinceLastEmail = now.getTime() - lastSentTime.getTime();
+
+      if (timeSinceLastEmail < emailInterval) {
+        const waitTime = emailInterval - timeSinceLastEmail;
+        const nextSendTime = new Date(now.getTime() + waitTime);
+        // Log only occasionally (not every check)
+        if (timeSinceLastEmail < 60000) { // Only log in first minute after sending
+          await campaignLogger.info(
+            campaignId,
+            "next_email_scheduled",
+            `Next email in ~${formatDuration(waitTime)} (${nextSendTime.toLocaleTimeString("ka-GE", { timeZone: "Asia/Tbilisi" })})`,
+            {
+              intervalMinutes,
+              waitMinutes: Math.round(waitTime / 60000),
+              schedule: `${dailyLimit} emails / ${endHour - startHour} hours = ~${intervalMinutes} min interval`
+            }
+          );
+        }
+        return;
+      }
     }
 
     // Get one pending recipient
@@ -304,21 +390,23 @@ async function processCampaignBatch(campaignId: string): Promise<void> {
       await campaignLogger.success(
         campaignId,
         "email_sent",
-        `Email sent successfully to ${client.email}`,
+        `Email sent successfully to ${client.email} (${dailySent + 1}/${dailyLimit} today)`,
         { recipientEmail: client.email, recipientCompany: client.companyName || "Unknown", messageId: sendResult.messageId }
       );
 
       // Update stats
       await updateCampaignStats(campaignId);
 
-      // Add random delay before next email
-      const delay = randomDelay(MIN_DELAY_MS, MAX_DELAY_MS);
-      const nextSendTime = new Date(Date.now() + delay);
+      // Log next email schedule
+      const nextEmailTime = new Date(Date.now() + emailInterval);
       await campaignLogger.info(
         campaignId,
         "next_email_scheduled",
-        `Next email scheduled in ${Math.round(delay / 1000)} seconds (~${nextSendTime.toLocaleTimeString()})`,
-        { delaySeconds: Math.round(delay / 1000) }
+        `Next email in ~${formatDuration(emailInterval)} (${nextEmailTime.toLocaleTimeString("ka-GE", { timeZone: "Asia/Tbilisi" })})`,
+        {
+          intervalMinutes,
+          schedule: `${dailyLimit} emails / ${endHour - startHour} hours`
+        }
       );
     } else {
       // Mark as failed
