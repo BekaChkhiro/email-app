@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { sendMail } from "@/lib/smtp";
-import { appendToSent } from "@/lib/imap";
 import { db } from "@/db";
 import { emailDrafts, emailDraftAttachments } from "@/db/schema";
 import { eq } from "drizzle-orm";
+
+// PHP API configuration
+const PHP_API_URL = process.env.PHP_MAIL_API_URL; // e.g., https://yourdomain.com/api/send-mail.php
+const PHP_API_KEY = process.env.PHP_MAIL_API_KEY;
 
 export async function POST(request: NextRequest) {
   const logs: string[] = [];
@@ -16,11 +18,17 @@ export async function POST(request: NextRequest) {
   try {
     log("Starting email send process...");
 
-    // Check SMTP configuration
-    log(`SMTP_HOST: ${process.env.SMTP_HOST ? "SET" : "NOT SET"}`);
-    log(`SMTP_USER: ${process.env.SMTP_USER ? "SET" : "NOT SET"}`);
-    log(`SMTP_PASSWORD: ${process.env.SMTP_PASSWORD ? "SET" : "NOT SET"}`);
-    log(`SMTP_PORT: ${process.env.SMTP_PORT || "465 (default)"}`);
+    // Check PHP API configuration
+    log(`PHP_MAIL_API_URL: ${PHP_API_URL ? "SET" : "NOT SET"}`);
+    log(`PHP_MAIL_API_KEY: ${PHP_API_KEY ? "SET" : "NOT SET"}`);
+
+    if (!PHP_API_URL || !PHP_API_KEY) {
+      log("ERROR: PHP Mail API not configured");
+      return NextResponse.json(
+        { error: "PHP Mail API not configured. Set PHP_MAIL_API_URL and PHP_MAIL_API_KEY in .env", logs },
+        { status: 500 }
+      );
+    }
 
     const session = await auth();
     if (!session?.user) {
@@ -40,8 +48,6 @@ export async function POST(request: NextRequest) {
       attachments,
       draftId,
       replyTo,
-      inReplyTo,
-      references,
     } = body;
 
     log(`To: ${to}`);
@@ -65,39 +71,45 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    log("Calling sendMail...");
-    const result = await sendMail({
-      to,
-      cc,
-      bcc,
+    // Prepare request body for PHP API
+    const phpRequestBody = {
+      to: Array.isArray(to) ? to.join(", ") : to,
+      cc: cc ? (Array.isArray(cc) ? cc.join(", ") : cc) : undefined,
+      bcc: bcc ? (Array.isArray(bcc) ? bcc.join(", ") : bcc) : undefined,
       subject,
       html,
       text,
-      attachments,
       replyTo,
-      inReplyTo,
-      references,
+      attachments,
+    };
+
+    log("Calling PHP Mail API...");
+    log(`URL: ${PHP_API_URL}`);
+
+    const phpResponse = await fetch(PHP_API_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Api-Key": PHP_API_KEY,
+      },
+      body: JSON.stringify(phpRequestBody),
     });
 
-    if (!result.success) {
-      log(`ERROR: sendMail failed - ${result.error}`);
-      return NextResponse.json({ error: result.error, logs }, { status: 500 });
+    log(`PHP API Response status: ${phpResponse.status}`);
+
+    const phpResult = await phpResponse.json();
+    log(`PHP API Response: ${JSON.stringify(phpResult)}`);
+
+    if (!phpResponse.ok || !phpResult.success) {
+      log(`ERROR: PHP API failed - ${phpResult.error}`);
+      return NextResponse.json(
+        { error: phpResult.error || "Failed to send email via PHP API", logs },
+        { status: 500 }
+      );
     }
 
-    log(`SUCCESS: Email sent, messageId: ${result.messageId}`);
-
-    // Save to Sent folder
-    if (result.rawEmail) {
-      try {
-        log("Saving to IMAP Sent folder...");
-        await appendToSent(result.rawEmail);
-        log("Saved to Sent folder");
-      } catch (e) {
-        const errMsg = e instanceof Error ? e.message : String(e);
-        log(`WARNING: Failed to save to Sent folder - ${errMsg}`);
-        // Don't fail if saving to Sent fails
-      }
-    }
+    log(`SUCCESS: Email sent via PHP API, messageId: ${phpResult.messageId}`);
+    log(`Method used: ${phpResult.method}`);
 
     // Delete draft if sending from draft
     if (draftId) {
@@ -117,7 +129,8 @@ export async function POST(request: NextRequest) {
     log("Email send complete!");
     return NextResponse.json({
       success: true,
-      messageId: result.messageId,
+      messageId: phpResult.messageId,
+      method: phpResult.method,
       logs,
     });
   } catch (error) {

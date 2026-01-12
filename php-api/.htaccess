@@ -1,0 +1,15 @@
+# Protect PHPMailer directory
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteRule ^PHPMailer/ - [F,L]
+</IfModule>
+
+# Disable directory listing
+Options -Indexes
+
+# Only allow POST requests to send-mail.php
+<Files "send-mail.php">
+    <LimitExcept POST OPTIONS>
+        Deny from all
+    </LimitExcept>
+</Files>
