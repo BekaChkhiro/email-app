@@ -251,6 +251,58 @@ export const campaignLogsRelations = relations(campaignLogs, ({ one }) => ({
 }));
 
 // =====================
+// EMAIL DRAFTS TABLE (for mail client)
+// =====================
+export const emailDrafts = pgTable("email_drafts", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  subject: varchar("subject", { length: 500 }),
+  toAddresses: text("to_addresses").array(),
+  ccAddresses: text("cc_addresses").array(),
+  bccAddresses: text("bcc_addresses").array(),
+  htmlContent: text("html_content"),
+  plainContent: text("plain_content"),
+  inReplyTo: varchar("in_reply_to", { length: 255 }),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// =====================
+// EMAIL DRAFT ATTACHMENTS TABLE
+// =====================
+export const emailDraftAttachments = pgTable(
+  "email_draft_attachments",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    draftId: uuid("draft_id")
+      .references(() => emailDrafts.id, { onDelete: "cascade" })
+      .notNull(),
+    filename: varchar("filename", { length: 255 }).notNull(),
+    mimeType: varchar("mime_type", { length: 100 }),
+    size: integer("size"),
+    storagePath: varchar("storage_path", { length: 500 }),
+    createdAt: timestamp("created_at").defaultNow(),
+  },
+  (table) => [index("idx_draft_attachments_draft").on(table.draftId)]
+);
+
+// =====================
+// EMAIL DRAFTS RELATIONS
+// =====================
+export const emailDraftsRelations = relations(emailDrafts, ({ many }) => ({
+  attachments: many(emailDraftAttachments),
+}));
+
+export const emailDraftAttachmentsRelations = relations(
+  emailDraftAttachments,
+  ({ one }) => ({
+    draft: one(emailDrafts, {
+      fields: [emailDraftAttachments.draftId],
+      references: [emailDrafts.id],
+    }),
+  })
+);
+
+// =====================
 // TYPE EXPORTS
 // =====================
 export type User = typeof users.$inferSelect;
@@ -276,3 +328,9 @@ export type NewClientNote = typeof clientNotes.$inferInsert;
 
 export type CampaignLog = typeof campaignLogs.$inferSelect;
 export type NewCampaignLog = typeof campaignLogs.$inferInsert;
+
+export type EmailDraft = typeof emailDrafts.$inferSelect;
+export type NewEmailDraft = typeof emailDrafts.$inferInsert;
+
+export type EmailDraftAttachment = typeof emailDraftAttachments.$inferSelect;
+export type NewEmailDraftAttachment = typeof emailDraftAttachments.$inferInsert;

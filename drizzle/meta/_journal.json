@@ -15,6 +15,13 @@
       "when": 1767971342860,
       "tag": "0001_worried_riptide",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1768211756866,
+      "tag": "0002_furry_hydra",
+      "breakpoints": true
     }
   ]
 }

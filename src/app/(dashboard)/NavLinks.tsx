@@ -8,6 +8,7 @@ const navLinks = [
   { href: "/clients/import", label: "Import" },
   { href: "/templates", label: "Templates" },
   { href: "/campaigns", label: "Campaigns" },
+  { href: "/mail", label: "Mail" },
 ];
 
 export function NavLinks() {
