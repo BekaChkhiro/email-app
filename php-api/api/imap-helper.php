@@ -73,12 +73,15 @@ class ImapHelper
      */
     public function selectFolder(string $folder): bool
     {
-        if ($this->currentFolder === $folder) {
+        // Convert clean path to IMAP path
+        $imapFolder = $this->getImapFolderPath($folder);
+
+        if ($this->currentFolder === $imapFolder) {
             return true;
         }
 
         $this->disconnect();
-        return $this->connect($folder);
+        return $this->connect($imapFolder);
     }
 
     /**
@@ -106,12 +109,27 @@ class ImapHelper
             // Get folder status
             $status = @imap_status($this->connection, $folder, SA_ALL);
 
-            $result[] = [
-                'name' => $this->getFolderDisplayName($folderName),
-                'path' => $folderName,
-                'total' => $status ? $status->messages : 0,
-                'unread' => $status ? $status->unseen : 0,
-            ];
+            // Skip duplicate spam folders
+            $cleanPath = $this->getCleanFolderPath($folderName);
+
+            // Check if we already have this folder (avoid duplicates like Junk and spam)
+            $isDuplicate = false;
+            foreach ($result as $existing) {
+                if ($existing['path'] === $cleanPath) {
+                    $isDuplicate = true;
+                    break;
+                }
+            }
+
+            if (!$isDuplicate) {
+                $result[] = [
+                    'name' => $this->getFolderDisplayName($folderName),
+                    'path' => $cleanPath,
+                    'icon' => $this->getFolderIcon($folderName),
+                    'total' => $status ? $status->messages : 0,
+                    'unread' => $status ? $status->unseen : 0,
+                ];
+            }
         }
 
         // Sort: INBOX first, then alphabetically
@@ -129,6 +147,9 @@ class ImapHelper
      */
     private function getFolderDisplayName(string $path): string
     {
+        // Remove INBOX. prefix
+        $cleanPath = preg_replace('/^INBOX\./', '', $path);
+
         $names = [
             'INBOX' => 'Inbox',
             'Sent' => 'Sent',
@@ -136,9 +157,69 @@ class ImapHelper
             'Trash' => 'Trash',
             'Spam' => 'Spam',
             'Junk' => 'Spam',
+            'spam' => 'Spam',
+            'Archive' => 'Archive',
         ];
 
-        return $names[$path] ?? $path;
+        return $names[$cleanPath] ?? $cleanPath;
+    }
+
+    /**
+     * Get icon name for folder (for frontend)
+     */
+    private function getFolderIcon(string $path): string
+    {
+        // Remove INBOX. prefix
+        $cleanPath = preg_replace('/^INBOX\./', '', $path);
+
+        $icons = [
+            'INBOX' => 'inbox',
+            'Sent' => 'send',
+            'Drafts' => 'file-text',
+            'Trash' => 'trash',
+            'Spam' => 'alert-circle',
+            'Junk' => 'alert-circle',
+            'spam' => 'alert-circle',
+            'Archive' => 'archive',
+        ];
+
+        return $icons[$cleanPath] ?? 'folder';
+    }
+
+    /**
+     * Get clean folder path (for display)
+     */
+    private function getCleanFolderPath(string $path): string
+    {
+        // Keep INBOX as is, but clean up INBOX.Sent to just Sent for common folders
+        $mapping = [
+            'INBOX.Sent' => 'Sent',
+            'INBOX.Drafts' => 'Drafts',
+            'INBOX.Trash' => 'Trash',
+            'INBOX.Junk' => 'Spam',
+            'INBOX.spam' => 'Spam',
+            'INBOX.Archive' => 'Archive',
+        ];
+
+        return $mapping[$path] ?? $path;
+    }
+
+    /**
+     * Get original IMAP folder path from clean path
+     */
+    private function getImapFolderPath(string $cleanPath): string
+    {
+        // Reverse mapping - clean path to original IMAP path
+        $mapping = [
+            'Sent' => 'INBOX.Sent',
+            'Drafts' => 'INBOX.Drafts',
+            'Trash' => 'INBOX.Trash',
+            'Spam' => 'INBOX.spam',
+            'Archive' => 'INBOX.Archive',
+            'INBOX' => 'INBOX',
+        ];
+
+        return $mapping[$cleanPath] ?? $cleanPath;
     }
 
     /**
@@ -633,7 +714,10 @@ class ImapHelper
     {
         $this->selectFolder($folder);
 
-        $result = imap_mail_move($this->connection, (string)$uid, $targetFolder, CP_UID);
+        // Convert target folder to IMAP path
+        $imapTargetFolder = $this->getImapFolderPath($targetFolder);
+
+        $result = imap_mail_move($this->connection, (string)$uid, $imapTargetFolder, CP_UID);
         imap_expunge($this->connection);
 
         return $result;
@@ -646,7 +730,11 @@ class ImapHelper
     {
         $this->selectFolder($folder);
 
-        if ($permanent || $folder === 'Trash') {
+        // Check if already in Trash
+        $imapFolder = $this->getImapFolderPath($folder);
+        $isInTrash = ($imapFolder === 'INBOX.Trash' || $folder === 'Trash');
+
+        if ($permanent || $isInTrash) {
             imap_delete($this->connection, (string)$uid, FT_UID);
             imap_expunge($this->connection);
             return true;
@@ -683,5 +771,91 @@ class ImapHelper
     public function setStarred(string $folder, int $uid, bool $starred = true): bool
     {
         return $this->setFlag($folder, $uid, '\\Flagged', $starred);
+    }
+
+    /**
+     * Append message to folder (for saving sent emails)
+     */
+    public function appendToFolder(string $folder, string $rawMessage, array $flags = []): bool
+    {
+        if (!$this->connection) {
+            $this->connect('INBOX');
+        }
+
+        $imapFolder = $this->getImapFolderPath($folder);
+        $mailbox = $this->buildMailbox($imapFolder);
+
+        $flagString = !empty($flags) ? '\\' . implode(' \\', $flags) : '\\Seen';
+
+        $result = @imap_append($this->connection, $mailbox, $rawMessage, $flagString);
+
+        return $result !== false;
+    }
+
+    /**
+     * Build raw email message for IMAP append
+     */
+    public function buildRawEmail(array $params): string
+    {
+        $boundary = '----=_Part_' . time() . '_' . md5(uniqid());
+        $date = date('r');
+        $messageId = '<' . time() . '.' . md5(uniqid()) . '@' . $this->config['host'] . '>';
+
+        $from = $params['from'] ?? '';
+        $to = $params['to'] ?? '';
+        $cc = $params['cc'] ?? '';
+        $subject = $params['subject'] ?? '';
+        $html = $params['html'] ?? '';
+        $text = $params['text'] ?? '';
+        $attachments = $params['attachments'] ?? [];
+
+        // Encode subject for UTF-8
+        $encodedSubject = '=?UTF-8?B?' . base64_encode($subject) . '?=';
+
+        // Build headers
+        $raw = "From: {$from}\r\n";
+        $raw .= "To: {$to}\r\n";
+        if ($cc) {
+            $raw .= "Cc: {$cc}\r\n";
+        }
+        $raw .= "Subject: {$encodedSubject}\r\n";
+        $raw .= "Date: {$date}\r\n";
+        $raw .= "Message-ID: {$messageId}\r\n";
+        $raw .= "MIME-Version: 1.0\r\n";
+
+        // Build body
+        if (!empty($attachments)) {
+            $raw .= "Content-Type: multipart/mixed; boundary=\"{$boundary}\"\r\n";
+            $raw .= "\r\n";
+            $raw .= "--{$boundary}\r\n";
+            $raw .= "Content-Type: text/html; charset=UTF-8\r\n";
+            $raw .= "Content-Transfer-Encoding: base64\r\n";
+            $raw .= "\r\n";
+            $raw .= chunk_split(base64_encode($html ?: nl2br($text)));
+            $raw .= "\r\n";
+
+            foreach ($attachments as $att) {
+                $filename = $att['filename'] ?? 'attachment';
+                $content = $att['content'] ?? '';
+                $contentType = $att['contentType'] ?? 'application/octet-stream';
+
+                $raw .= "--{$boundary}\r\n";
+                $raw .= "Content-Type: {$contentType}; name=\"{$filename}\"\r\n";
+                $raw .= "Content-Disposition: attachment; filename=\"{$filename}\"\r\n";
+                $raw .= "Content-Transfer-Encoding: base64\r\n";
+                $raw .= "\r\n";
+                $raw .= chunk_split($content);
+                $raw .= "\r\n";
+            }
+
+            $raw .= "--{$boundary}--\r\n";
+        } else {
+            $raw .= "Content-Type: text/html; charset=UTF-8\r\n";
+            $raw .= "Content-Transfer-Encoding: base64\r\n";
+            $raw .= "\r\n";
+            $raw .= chunk_split(base64_encode($html ?: nl2br($text)));
+        }
+
+        return $raw;
     }
 }

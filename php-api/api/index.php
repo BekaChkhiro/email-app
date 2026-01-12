@@ -199,11 +199,12 @@ function handleSend(array $config, Auth $auth, string $method, array $input): vo
     }
 
     $smtp = $config['smtp'];
+    $fromFull = $smtp['from_name'] . ' <' . $smtp['from_email'] . '>';
 
     // Build email headers
     $headers = [];
     $headers[] = 'MIME-Version: 1.0';
-    $headers[] = 'From: ' . $smtp['from_name'] . ' <' . $smtp['from_email'] . '>';
+    $headers[] = 'From: ' . $fromFull;
 
     if ($replyTo) {
         $headers[] = 'Reply-To: ' . $replyTo;
@@ -217,7 +218,7 @@ function handleSend(array $config, Auth $auth, string $method, array $input): vo
         $headers[] = 'Bcc: ' . $bcc;
     }
 
-    $messageId = '<' . time() . '.' . md5(uniqid()) . '@' . parse_url($smtp['from_email'], PHP_URL_HOST) . '>';
+    $messageId = '<' . time() . '.' . md5(uniqid()) . '@' . $config['imap']['host'] . '>';
     $headers[] = 'Message-ID: ' . $messageId;
 
     // Build body
@@ -257,9 +258,29 @@ function handleSend(array $config, Auth $auth, string $method, array $input): vo
     $sent = mail($to, $encodedSubject, $body, implode("\r\n", $headers));
 
     if ($sent) {
+        // Save to Sent folder via IMAP
+        try {
+            $imap = new ImapHelper($config);
+            $rawEmail = $imap->buildRawEmail([
+                'from' => $fromFull,
+                'to' => $to,
+                'cc' => $cc,
+                'subject' => $subject,
+                'html' => $html,
+                'text' => $text,
+                'attachments' => $attachments,
+            ]);
+            $imap->appendToFolder('Sent', $rawEmail, ['Seen']);
+            $imap->disconnect();
+        } catch (Exception $e) {
+            // Log error but don't fail - email was already sent
+            error_log('Failed to save to Sent folder: ' . $e->getMessage());
+        }
+
         $auth->sendSuccess([
             'messageId' => $messageId,
-            'method' => 'native_mail'
+            'method' => 'native_mail',
+            'savedToSent' => true
         ]);
     } else {
         $auth->sendError('Failed to send email', 500);

@@ -6,10 +6,13 @@ import {
   FileText,
   Trash2,
   Mail,
+  AlertCircle,
+  Archive,
+  Folder as FolderIcon,
   LucideIcon,
 } from "lucide-react";
 
-interface Folder {
+interface MailFolder {
   name: string;
   path: string;
   icon: string;
@@ -18,7 +21,7 @@ interface Folder {
 }
 
 interface FolderSidebarProps {
-  folders: Folder[];
+  folders: MailFolder[];
   activeFolder: string;
   onFolderSelect: (path: string) => void;
   onCompose: () => void;
@@ -29,6 +32,9 @@ const iconMap: Record<string, LucideIcon> = {
   send: Send,
   "file-text": FileText,
   trash: Trash2,
+  "alert-circle": AlertCircle,
+  archive: Archive,
+  folder: FolderIcon,
 };
 
 export function FolderSidebar({

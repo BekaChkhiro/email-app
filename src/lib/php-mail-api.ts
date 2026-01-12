@@ -274,3 +274,34 @@ export function getAttachmentUrl(
   }
   return `${PHP_API_URL}/attachment?folder=${encodeURIComponent(folder)}&uid=${uid}&partId=${encodeURIComponent(partId)}`;
 }
+
+export async function getAttachment(
+  folder: string,
+  uid: number,
+  partId: string
+): Promise<{ content: ArrayBuffer; filename: string; contentType: string }> {
+  if (!PHP_API_URL || !PHP_API_KEY) {
+    throw new PhpMailApiError("PHP Mail API not configured");
+  }
+
+  const url = `${PHP_API_URL}/attachment?folder=${encodeURIComponent(folder)}&uid=${uid}&partId=${encodeURIComponent(partId)}`;
+
+  const response = await fetch(url, {
+    headers: {
+      "X-Api-Key": PHP_API_KEY,
+    },
+  });
+
+  if (!response.ok) {
+    throw new PhpMailApiError("Failed to fetch attachment", response.status);
+  }
+
+  const contentDisposition = response.headers.get("content-disposition") || "";
+  const filenameMatch = contentDisposition.match(/filename="(.+)"/);
+  const filename = filenameMatch ? filenameMatch[1] : "attachment";
+  const contentType = response.headers.get("content-type") || "application/octet-stream";
+
+  const content = await response.arrayBuffer();
+
+  return { content, filename, contentType };
+}

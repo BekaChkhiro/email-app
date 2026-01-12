@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { getThread, getMessage } from "@/lib/imap";
+import { getMessage } from "@/lib/php-mail-api";
 
 export async function GET(
   request: NextRequest,
@@ -20,31 +20,19 @@ export async function GET(
       return NextResponse.json({ error: "Invalid message ID" }, { status: 400 });
     }
 
-    // First get the message to find its Message-ID
+    // Get the message
     const message = await getMessage(folder, uid);
+
     if (!message) {
       return NextResponse.json({ error: "Message not found" }, { status: 404 });
     }
 
-    // If message has no Message-ID, return just this message
-    if (!message.messageId) {
-      return NextResponse.json({ thread: [message] });
-    }
-
-    // Get the full thread
-    const thread = await getThread(folder, message.messageId);
-
-    // If no thread found, return just the original message
-    if (thread.length === 0) {
-      return NextResponse.json({ thread: [message] });
-    }
-
-    return NextResponse.json({ thread });
+    // For now, return just the single message as thread
+    // Full threading can be implemented later in PHP API
+    return NextResponse.json({ thread: [message] });
   } catch (error) {
     console.error("Error fetching thread:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch thread" },
-      { status: 500 }
-    );
+    const msg = error instanceof Error ? error.message : "Failed to fetch thread";
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }

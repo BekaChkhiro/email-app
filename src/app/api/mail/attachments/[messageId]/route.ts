@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { getAttachment } from "@/lib/imap";
+import { getAttachment } from "@/lib/php-mail-api";
 
 export async function GET(
   request: NextRequest,
@@ -14,38 +14,27 @@ export async function GET(
 
     const { messageId } = await params;
     const folder = request.nextUrl.searchParams.get("folder") || "INBOX";
-    const indexStr = request.nextUrl.searchParams.get("index");
+    const partId = request.nextUrl.searchParams.get("partId") || "2";
 
     const uid = parseInt(messageId);
-    const index = indexStr ? parseInt(indexStr) : 0;
 
     if (isNaN(uid)) {
       return NextResponse.json({ error: "Invalid message ID" }, { status: 400 });
     }
 
-    const attachment = await getAttachment(folder, uid, index);
-
-    if (!attachment || !attachment.content) {
-      return NextResponse.json(
-        { error: "Attachment not found" },
-        { status: 404 }
-      );
-    }
+    const attachment = await getAttachment(folder, uid, partId);
 
     // Return the file as a download
-    const content = new Uint8Array(attachment.content);
-    return new NextResponse(content, {
+    return new NextResponse(attachment.content, {
       headers: {
-        "Content-Type": attachment.contentType || "application/octet-stream",
+        "Content-Type": attachment.contentType,
         "Content-Disposition": `attachment; filename="${encodeURIComponent(attachment.filename)}"`,
-        "Content-Length": attachment.size.toString(),
+        "Content-Length": attachment.content.byteLength.toString(),
       },
     });
   } catch (error) {
     console.error("Error fetching attachment:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch attachment" },
-      { status: 500 }
-    );
+    const msg = error instanceof Error ? error.message : "Failed to fetch attachment";
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }

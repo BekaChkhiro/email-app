@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { markAsRead } from "@/lib/imap";
+import { markAsRead } from "@/lib/php-mail-api";
 
 export async function POST(
   request: NextRequest,
@@ -26,9 +26,7 @@ export async function POST(
     return NextResponse.json({ success: true, read });
   } catch (error) {
     console.error("Error marking message:", error);
-    return NextResponse.json(
-      { error: "Failed to mark message" },
-      { status: 500 }
-    );
+    const msg = error instanceof Error ? error.message : "Failed to mark message";
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }
