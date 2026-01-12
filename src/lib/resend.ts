@@ -31,6 +31,24 @@ export interface SendEmailResult {
 }
 
 /**
+ * Encode string to base64 (UTF-8 safe)
+ */
+function encodeBase64(str: string): string {
+  return Buffer.from(str, "utf-8").toString("base64");
+}
+
+/**
+ * Encode subject for email header (RFC 2047)
+ */
+function encodeSubject(subject: string): string {
+  // Check if subject has non-ASCII characters
+  if (/[^\x00-\x7F]/.test(subject)) {
+    return `=?UTF-8?B?${encodeBase64(subject)}?=`;
+  }
+  return subject;
+}
+
+/**
  * Build raw email string for IMAP append
  */
 function buildRawEmailForImap(params: {
@@ -48,7 +66,7 @@ function buildRawEmailForImap(params: {
   let raw = "";
   raw += `From: ${params.from}\r\n`;
   raw += `To: ${params.to}\r\n`;
-  raw += `Subject: ${params.subject}\r\n`;
+  raw += `Subject: ${encodeSubject(params.subject)}\r\n`;
   raw += `Date: ${date}\r\n`;
   raw += `Message-ID: <${params.messageId}@resend.dev>\r\n`;
   if (params.replyTo) {
@@ -62,20 +80,20 @@ function buildRawEmailForImap(params: {
     raw += `\r\n`;
     raw += `--${boundary}\r\n`;
     raw += `Content-Type: text/plain; charset=utf-8\r\n`;
-    raw += `Content-Transfer-Encoding: quoted-printable\r\n`;
+    raw += `Content-Transfer-Encoding: base64\r\n`;
     raw += `\r\n`;
-    raw += params.text + "\r\n";
+    raw += encodeBase64(params.text) + "\r\n";
     raw += `--${boundary}\r\n`;
     raw += `Content-Type: text/html; charset=utf-8\r\n`;
-    raw += `Content-Transfer-Encoding: quoted-printable\r\n`;
+    raw += `Content-Transfer-Encoding: base64\r\n`;
     raw += `\r\n`;
-    raw += params.html + "\r\n";
+    raw += encodeBase64(params.html) + "\r\n";
     raw += `--${boundary}--\r\n`;
   } else {
     raw += `Content-Type: text/html; charset=utf-8\r\n`;
-    raw += `Content-Transfer-Encoding: quoted-printable\r\n`;
+    raw += `Content-Transfer-Encoding: base64\r\n`;
     raw += `\r\n`;
-    raw += params.html + "\r\n";
+    raw += encodeBase64(params.html) + "\r\n";
   }
 
   return raw;
