@@ -344,11 +344,12 @@ async function processCampaignBatch(campaignId: string): Promise<void> {
       { recipientEmail: client.email, recipientCompany: client.companyName || "Unknown", subject }
     );
 
-    // Send email
+    // Send email and save to IMAP for threading
     const sendResult = await sendEmail({
       to: client.email,
       subject,
       html: htmlContent,
+      saveToImap: true, // Save to IMAP Sent folder for threading with client replies
     });
 
     if (sendResult.success) {

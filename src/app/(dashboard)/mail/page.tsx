@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   MailLayout,
   FolderSidebar,
@@ -10,6 +10,9 @@ import {
   SearchBar,
 } from "@/components/mail";
 import { RefreshCw } from "lucide-react";
+
+// Auto-refresh interval in milliseconds (10 seconds)
+const AUTO_REFRESH_INTERVAL = 10000;
 
 interface Folder {
   name: string;
@@ -49,6 +52,7 @@ export default function MailPage() {
   const [activeFolder, setActiveFolder] = useState("INBOX");
   const [messages, setMessages] = useState<EmailMessage[]>([]);
   const [selectedEmail, setSelectedEmail] = useState<EmailFull | null>(null);
+  const [thread, setThread] = useState<EmailFull[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingEmail, setIsLoadingEmail] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -59,6 +63,9 @@ export default function MailPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [page, setPage] = useState(1);
   const [pagination, setPagination] = useState({ total: 0, totalPages: 1 });
+
+  // Ref to track if polling is in progress
+  const isPollingRef = useRef(false);
 
   // Fetch folders
   const fetchFolders = useCallback(async () => {
@@ -107,9 +114,10 @@ export default function MailPage() {
     setIsRefreshing(false);
   };
 
-  // Fetch single email
+  // Fetch single email (without thread for speed)
   const fetchEmail = async (uid: number) => {
     setIsLoadingEmail(true);
+    setThread([]);
     try {
       const res = await fetch(
         `/api/mail/messages/${uid}?folder=${encodeURIComponent(activeFolder)}`
@@ -136,6 +144,21 @@ export default function MailPage() {
       console.error("Failed to fetch email:", error);
     } finally {
       setIsLoadingEmail(false);
+    }
+  };
+
+  // Fetch thread separately (manual load for performance)
+  const fetchThread = async (uid: number) => {
+    try {
+      const threadRes = await fetch(
+        `/api/mail/messages/${uid}/thread?folder=${encodeURIComponent(activeFolder)}`
+      );
+      const threadData = await threadRes.json();
+      if (threadData.thread && threadData.thread.length > 1) {
+        setThread(threadData.thread);
+      }
+    } catch (threadError) {
+      console.error("Failed to fetch thread:", threadError);
     }
   };
 
@@ -208,31 +231,34 @@ export default function MailPage() {
     }
   };
 
-  // Reply to email
-  const handleReply = () => {
-    if (selectedEmail) {
-      setReplyTo(selectedEmail);
+  // Reply to email (optionally to a specific email in thread)
+  const handleReply = (email?: EmailFull) => {
+    const targetEmail = email || (thread.length > 0 ? thread[thread.length - 1] : selectedEmail);
+    if (targetEmail) {
+      setReplyTo(targetEmail);
       setForwardEmail(null);
       setReplyAll(false);
       setIsComposeOpen(true);
     }
   };
 
-  // Reply all
-  const handleReplyAll = () => {
-    if (selectedEmail) {
-      setReplyTo(selectedEmail);
+  // Reply all (optionally to a specific email in thread)
+  const handleReplyAll = (email?: EmailFull) => {
+    const targetEmail = email || (thread.length > 0 ? thread[thread.length - 1] : selectedEmail);
+    if (targetEmail) {
+      setReplyTo(targetEmail);
       setForwardEmail(null);
       setReplyAll(true);
       setIsComposeOpen(true);
     }
   };
 
-  // Forward email
-  const handleForward = () => {
-    if (selectedEmail) {
+  // Forward email (optionally a specific email in thread)
+  const handleForward = (email?: EmailFull) => {
+    const targetEmail = email || (thread.length > 0 ? thread[thread.length - 1] : selectedEmail);
+    if (targetEmail) {
       setReplyTo(null);
-      setForwardEmail(selectedEmail);
+      setForwardEmail(targetEmail);
       setReplyAll(false);
       setIsComposeOpen(true);
     }
@@ -257,9 +283,53 @@ export default function MailPage() {
   // Reset when folder changes
   useEffect(() => {
     setSelectedEmail(null);
+    setThread([]);
     setPage(1);
     setSearchQuery("");
   }, [activeFolder]);
+
+  // Auto-refresh polling for new emails
+  useEffect(() => {
+    const silentRefresh = async () => {
+      // Don't poll if already polling or if searching
+      if (isPollingRef.current || searchQuery) return;
+
+      isPollingRef.current = true;
+
+      try {
+        // Fetch folders
+        const foldersRes = await fetch("/api/mail/folders");
+        const foldersData = await foldersRes.json();
+        if (foldersData.folders) {
+          setFolders(foldersData.folders);
+        }
+
+        // Fetch messages
+        const params = new URLSearchParams({
+          folder: activeFolder,
+          page: page.toString(),
+          limit: "50",
+        });
+        const messagesRes = await fetch(`/api/mail/messages?${params}`);
+        const messagesData = await messagesRes.json();
+        if (messagesData.messages) {
+          setMessages(messagesData.messages);
+          setPagination({
+            total: messagesData.pagination?.total || 0,
+            totalPages: messagesData.pagination?.totalPages || 1,
+          });
+        }
+      } catch (error) {
+        console.error("Silent refresh failed:", error);
+      } finally {
+        isPollingRef.current = false;
+      }
+    };
+
+    const intervalId = setInterval(silentRefresh, AUTO_REFRESH_INTERVAL);
+
+    return () => clearInterval(intervalId);
+  }, [activeFolder, page, searchQuery]);
 
   return (
     <div className="h-[calc(100vh-64px)]">
@@ -341,6 +411,7 @@ export default function MailPage() {
         detail={
           <EmailView
             email={selectedEmail}
+            thread={thread}
             isLoading={isLoadingEmail}
             folder={activeFolder}
             onReply={handleReply}
@@ -350,7 +421,11 @@ export default function MailPage() {
               selectedEmail && handleMoveToTrash(selectedEmail.uid)
             }
             onToggleStar={handleToggleStarSelected}
-            onClose={() => setSelectedEmail(null)}
+            onClose={() => {
+              setSelectedEmail(null);
+              setThread([]);
+            }}
+            onLoadThread={() => selectedEmail && fetchThread(selectedEmail.uid)}
           />
         }
       />

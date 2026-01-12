@@ -52,11 +52,12 @@ export async function POST(request: NextRequest) {
     const personalizedSubject = personalize(subject, client);
     const personalizedHtml = personalize(htmlContent, client);
 
-    // Send email
+    // Send email and save to IMAP for threading
     const result = await sendEmail({
       to: client.email,
       subject: personalizedSubject,
       html: personalizedHtml,
+      saveToImap: true, // Save to IMAP Sent folder for threading with client replies
     });
 
     if (!result.success) {
