@@ -276,21 +276,7 @@ async function processCampaignBatch(campaignId: string): Promise<void> {
       const timeSinceLastEmail = now.getTime() - lastSentTime.getTime();
 
       if (timeSinceLastEmail < emailInterval) {
-        const waitTime = emailInterval - timeSinceLastEmail;
-        const nextSendTime = new Date(now.getTime() + waitTime);
-        // Log only occasionally (not every check)
-        if (timeSinceLastEmail < 60000) { // Only log in first minute after sending
-          await campaignLogger.info(
-            campaignId,
-            "next_email_scheduled",
-            `Next email in ~${formatDuration(waitTime)} (${nextSendTime.toLocaleTimeString("ka-GE", { timeZone: "Asia/Tbilisi" })})`,
-            {
-              intervalMinutes,
-              waitMinutes: Math.round(waitTime / 60000),
-              schedule: `${dailyLimit} emails / ${endHour - startHour} hours = ~${intervalMinutes} min interval`
-            }
-          );
-        }
+        // Not time yet, wait silently
         return;
       }
     }

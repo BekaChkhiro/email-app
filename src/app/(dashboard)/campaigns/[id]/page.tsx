@@ -21,12 +21,16 @@ interface CampaignDetail {
   startedAt: string | null;
   completedAt: string | null;
   recipientStats: Record<string, number>;
+  emailStats: Record<string, number>;
   sampleRecipients: Array<{
     id: string;
     companyName: string | null;
     email: string | null;
     status: string;
     sentAt: string | null;
+    emailStatus: string | null;
+    openedAt: string | null;
+    clickedAt: string | null;
   }>;
 }
 
@@ -178,18 +182,29 @@ export default function CampaignDetailPage() {
     });
   };
 
-  // Calculate estimated next send
+  // Calculate email interval based on daily limit and send window
+  const calculateEmailInterval = () => {
+    if (!campaign) return 0;
+    const windowHours = campaign.sendEndHour - campaign.sendStartHour;
+    const windowMinutes = windowHours * 60;
+    const intervalMinutes = windowMinutes / campaign.dailyLimit;
+    return Math.max(intervalMinutes, 5); // Minimum 5 minutes
+  };
+
+  // Calculate estimated next send based on last activity
   const getNextSendEstimate = () => {
     if (!campaign || campaign.status !== "active") return null;
     const now = new Date();
     const currentHour = now.getHours();
 
+    // Before send window
     if (currentHour < campaign.sendStartHour) {
       const next = new Date();
       next.setHours(campaign.sendStartHour, 0, 0, 0);
       return next;
     }
 
+    // After send window
     if (currentHour >= campaign.sendEndHour) {
       const next = new Date();
       next.setDate(next.getDate() + 1);
@@ -197,10 +212,22 @@ export default function CampaignDetailPage() {
       return next;
     }
 
-    // Within sending hours - next batch in 5-15 minutes
-    const next = new Date();
-    next.setMinutes(next.getMinutes() + 5);
-    return next;
+    // Within sending hours - calculate based on interval and last activity
+    const intervalMinutes = calculateEmailInterval();
+
+    // If we have recent activity, use the last sent time
+    if (recentActivity.length > 0) {
+      const lastSent = new Date(recentActivity[0].sentAt);
+      const next = new Date(lastSent.getTime() + intervalMinutes * 60 * 1000);
+      // If next time is in the past, return now (will send soon)
+      if (next <= now) {
+        return now;
+      }
+      return next;
+    }
+
+    // No recent activity, will send soon
+    return now;
   };
 
   if (isLoading) {
@@ -383,17 +410,22 @@ export default function CampaignDetailPage() {
                   />
                 </div>
                 {nextSend && (
-                  <p className="text-xs text-slate-500 mt-2 flex items-center gap-1">
-                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    Next batch: ~{formatTime(nextSend.toISOString())}
-                  </p>
+                  <div className="text-xs text-slate-500 mt-2 space-y-1">
+                    <p className="flex items-center gap-1">
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      Next email: ~{formatTime(nextSend.toISOString())}
+                    </p>
+                    <p className="text-slate-400">
+                      Interval: ~{Math.round(calculateEmailInterval())} min ({campaign.dailyLimit} emails / {campaign.sendEndHour - campaign.sendStartHour}h)
+                    </p>
+                  </div>
                 )}
               </div>
             )}
 
-            {/* Stats */}
+            {/* Send Stats */}
             <div className="grid grid-cols-4 gap-4 pt-4 border-t border-slate-100">
               <div className="text-center">
                 <p className="text-2xl font-bold text-slate-400">
@@ -420,6 +452,39 @@ export default function CampaignDetailPage() {
                 <p className="text-sm text-slate-500">Skipped</p>
               </div>
             </div>
+
+            {/* Email Tracking Stats */}
+            {campaign.sentCount > 0 && (
+              <div className="mt-6 pt-4 border-t border-slate-100">
+                <h3 className="text-sm font-medium text-slate-700 mb-3">Email Tracking</h3>
+                <div className="grid grid-cols-4 gap-4">
+                  <div className="text-center p-3 bg-blue-50 rounded-lg">
+                    <p className="text-2xl font-bold text-blue-600">
+                      {campaign.emailStats?.delivered || 0}
+                    </p>
+                    <p className="text-xs text-blue-600">Delivered</p>
+                  </div>
+                  <div className="text-center p-3 bg-purple-50 rounded-lg">
+                    <p className="text-2xl font-bold text-purple-600">
+                      {campaign.emailStats?.opened || 0}
+                    </p>
+                    <p className="text-xs text-purple-600">Opened</p>
+                  </div>
+                  <div className="text-center p-3 bg-emerald-50 rounded-lg">
+                    <p className="text-2xl font-bold text-emerald-600">
+                      {campaign.emailStats?.clicked || 0}
+                    </p>
+                    <p className="text-xs text-emerald-600">Clicked</p>
+                  </div>
+                  <div className="text-center p-3 bg-orange-50 rounded-lg">
+                    <p className="text-2xl font-bold text-orange-600">
+                      {campaign.emailStats?.bounced || 0}
+                    </p>
+                    <p className="text-xs text-orange-600">Bounced</p>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Tabs: Recipients / Activity */}
@@ -474,13 +539,14 @@ export default function CampaignDetailPage() {
                       <th className="table-header-cell">Company</th>
                       <th className="table-header-cell">Email</th>
                       <th className="table-header-cell">Status</th>
+                      <th className="table-header-cell">Tracking</th>
                       <th className="table-header-cell">Sent At</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {campaign.sampleRecipients.length === 0 ? (
                       <tr>
-                        <td colSpan={4} className="p-8 text-center text-slate-500">
+                        <td colSpan={5} className="p-8 text-center text-slate-500">
                           No recipients
                         </td>
                       </tr>
@@ -497,6 +563,48 @@ export default function CampaignDetailPage() {
                             <span className={getStatusBadge(recipient.status || "pending")}>
                               {recipient.status || "pending"}
                             </span>
+                          </td>
+                          <td className="table-cell">
+                            {recipient.status === "sent" && (
+                              <div className="flex items-center gap-2">
+                                {recipient.emailStatus === "delivered" && (
+                                  <span className="inline-flex items-center gap-1 text-xs text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
+                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                    </svg>
+                                    Delivered
+                                  </span>
+                                )}
+                                {recipient.emailStatus === "opened" && (
+                                  <span className="inline-flex items-center gap-1 text-xs text-purple-600 bg-purple-50 px-2 py-0.5 rounded-full">
+                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                    </svg>
+                                    Opened
+                                  </span>
+                                )}
+                                {recipient.emailStatus === "clicked" && (
+                                  <span className="inline-flex items-center gap-1 text-xs text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">
+                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122" />
+                                    </svg>
+                                    Clicked
+                                  </span>
+                                )}
+                                {recipient.emailStatus === "bounced" && (
+                                  <span className="inline-flex items-center gap-1 text-xs text-red-600 bg-red-50 px-2 py-0.5 rounded-full">
+                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                    </svg>
+                                    Bounced
+                                  </span>
+                                )}
+                                {!recipient.emailStatus || recipient.emailStatus === "sent" && (
+                                  <span className="text-xs text-slate-400">Waiting...</span>
+                                )}
+                              </div>
+                            )}
                           </td>
                           <td className="table-cell text-slate-500">
                             {formatDate(recipient.sentAt)}

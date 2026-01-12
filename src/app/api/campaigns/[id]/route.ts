@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { campaigns, campaignRecipients, clients, emailTemplates } from "@/db/schema";
+import { campaigns, campaignRecipients, clients, emailTemplates, emailHistory } from "@/db/schema";
 import { eq, sql } from "drizzle-orm";
 
 export async function GET(
@@ -50,7 +50,17 @@ export async function GET(
       .where(eq(campaignRecipients.campaignId, id))
       .groupBy(campaignRecipients.status);
 
-    // Get sample recipients
+    // Get email tracking stats (delivered, opened, clicked, bounced)
+    const emailStats = await db
+      .select({
+        status: emailHistory.status,
+        count: sql<number>`count(*)::int`,
+      })
+      .from(emailHistory)
+      .where(eq(emailHistory.campaignId, id))
+      .groupBy(emailHistory.status);
+
+    // Get sample recipients with email tracking status
     const sampleRecipients = await db
       .select({
         id: clients.id,
@@ -58,15 +68,23 @@ export async function GET(
         email: clients.email,
         status: campaignRecipients.status,
         sentAt: campaignRecipients.sentAt,
+        emailStatus: emailHistory.status,
+        openedAt: emailHistory.openedAt,
+        clickedAt: emailHistory.clickedAt,
       })
       .from(campaignRecipients)
       .innerJoin(clients, eq(campaignRecipients.clientId, clients.id))
+      .leftJoin(emailHistory, eq(emailHistory.clientId, clients.id))
       .where(eq(campaignRecipients.campaignId, id))
       .limit(20);
 
     return NextResponse.json({
       ...campaign[0],
       recipientStats: recipientStats.reduce(
+        (acc, curr) => ({ ...acc, [curr.status || "unknown"]: curr.count }),
+        {}
+      ),
+      emailStats: emailStats.reduce(
         (acc, curr) => ({ ...acc, [curr.status || "unknown"]: curr.count }),
         {}
       ),
