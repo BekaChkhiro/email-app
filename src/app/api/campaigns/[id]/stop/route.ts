@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { campaigns } from "@/db/schema";
 import { eq } from "drizzle-orm";
+import { stopCampaignProcessor } from "@/lib/campaign-processor";
+import { campaignLogger } from "@/lib/campaign-logger";
 
 export async function POST(
   request: NextRequest,
@@ -35,6 +37,9 @@ export async function POST(
       );
     }
 
+    // Stop the background processor
+    stopCampaignProcessor(id);
+
     const updated = await db
       .update(campaigns)
       .set({
@@ -43,6 +48,12 @@ export async function POST(
       })
       .where(eq(campaigns.id, id))
       .returning();
+
+    await campaignLogger.warning(
+      id,
+      "campaign_stopped",
+      "Campaign has been stopped permanently"
+    );
 
     return NextResponse.json({
       success: true,

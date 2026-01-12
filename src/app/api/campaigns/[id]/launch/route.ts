@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { campaigns } from "@/db/schema";
 import { eq } from "drizzle-orm";
+import { startCampaignProcessor } from "@/lib/campaign-processor";
+import { campaignLogger } from "@/lib/campaign-logger";
 
 export async function POST(
   request: NextRequest,
@@ -52,6 +54,17 @@ export async function POST(
       })
       .where(eq(campaigns.id, id))
       .returning();
+
+    // Log campaign start
+    await campaignLogger.info(
+      id,
+      "campaign_started",
+      `Campaign "${campaign.name}" has been launched`,
+      { totalRecipients: campaign.totalRecipients ?? 0, dailyLimit: campaign.dailyLimit ?? 10 }
+    );
+
+    // Start background processor for this campaign
+    startCampaignProcessor(id);
 
     return NextResponse.json({
       success: true,

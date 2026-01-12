@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { campaigns } from "@/db/schema";
 import { eq } from "drizzle-orm";
+import { startCampaignProcessor } from "@/lib/campaign-processor";
+import { campaignLogger } from "@/lib/campaign-logger";
 
 export async function POST(
   request: NextRequest,
@@ -33,6 +35,15 @@ export async function POST(
       .set({ status: "active" })
       .where(eq(campaigns.id, id))
       .returning();
+
+    await campaignLogger.info(
+      id,
+      "campaign_resumed",
+      "Campaign has been resumed"
+    );
+
+    // Start the background processor
+    startCampaignProcessor(id);
 
     return NextResponse.json({
       success: true,

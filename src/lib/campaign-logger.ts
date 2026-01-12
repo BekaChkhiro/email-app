@@ -12,11 +12,20 @@ export type LogEvent =
   | "daily_limit_reached"
   | "no_pending_recipients"
   | "recipient_no_email"
+  | "recipient_skipped"
   | "email_sending"
   | "email_sent"
   | "email_failed"
+  | "campaign_started"
+  | "campaign_paused"
+  | "campaign_resumed"
+  | "campaign_stopped"
   | "campaign_completed"
-  | "processing_error";
+  | "processing_error"
+  | "processor_error"
+  | "resend_not_configured"
+  | "waiting_for_send_window"
+  | "next_email_scheduled";
 
 export interface LogMetadata {
   recipientEmail?: string;
@@ -28,6 +37,8 @@ export interface LogMetadata {
   currentHour?: number;
   sendWindow?: string;
   subject?: string;
+  totalRecipients?: number;
+  delaySeconds?: number;
   [key: string]: unknown;
 }
 
