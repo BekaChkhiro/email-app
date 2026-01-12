@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { toggleStar } from "@/lib/imap";
+import { setStarred } from "@/lib/php-mail-api";
 
 export async function POST(
   request: NextRequest,
@@ -28,14 +28,12 @@ export async function POST(
       );
     }
 
-    await toggleStar(folder, uid, starred);
+    await setStarred(folder, uid, starred);
 
     return NextResponse.json({ success: true, starred });
   } catch (error) {
     console.error("Error toggling star:", error);
-    return NextResponse.json(
-      { error: "Failed to toggle star" },
-      { status: 500 }
-    );
+    const msg = error instanceof Error ? error.message : "Failed to toggle star";
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }

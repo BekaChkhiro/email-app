@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { getMessages } from "@/lib/imap";
+import { getMessages } from "@/lib/php-mail-api";
 
 export async function GET(request: NextRequest) {
   try {
@@ -14,22 +14,15 @@ export async function GET(request: NextRequest) {
     const page = parseInt(searchParams.get("page") || "1");
     const limit = parseInt(searchParams.get("limit") || "50");
 
-    const { messages, total } = await getMessages(folder, page, limit);
+    const { messages, pagination } = await getMessages(folder, page, limit);
 
     return NextResponse.json({
       messages,
-      pagination: {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit),
-      },
+      pagination,
     });
   } catch (error) {
     console.error("Error fetching messages:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch messages" },
-      { status: 500 }
-    );
+    const message = error instanceof Error ? error.message : "Failed to fetch messages";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

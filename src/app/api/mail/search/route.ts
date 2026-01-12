@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { searchMessages } from "@/lib/imap";
+import { searchMessages } from "@/lib/php-mail-api";
 
 export async function GET(request: NextRequest) {
   try {
@@ -21,9 +21,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ messages });
   } catch (error) {
     console.error("Error searching messages:", error);
-    return NextResponse.json(
-      { error: "Failed to search messages" },
-      { status: 500 }
-    );
+    const msg = error instanceof Error ? error.message : "Failed to search messages";
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }

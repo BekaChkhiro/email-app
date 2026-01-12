@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { getMessage, deleteMessage, markAsRead } from "@/lib/imap";
+import { getMessage, deleteMessage } from "@/lib/php-mail-api";
 
 export async function GET(
   request: NextRequest,
@@ -26,19 +26,13 @@ export async function GET(
       return NextResponse.json({ error: "Message not found" }, { status: 404 });
     }
 
-    // Mark as read when opening
-    if (!message.isRead) {
-      await markAsRead(folder, uid, true);
-      message.isRead = true;
-    }
+    // PHP API automatically marks as read when fetching
 
     return NextResponse.json({ message });
   } catch (error) {
     console.error("Error fetching message:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch message" },
-      { status: 500 }
-    );
+    const msg = error instanceof Error ? error.message : "Failed to fetch message";
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }
 
@@ -65,9 +59,7 @@ export async function DELETE(
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Error deleting message:", error);
-    return NextResponse.json(
-      { error: "Failed to delete message" },
-      { status: 500 }
-    );
+    const msg = error instanceof Error ? error.message : "Failed to delete message";
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }

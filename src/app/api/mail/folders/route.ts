@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { getFolders } from "@/lib/imap";
+import { getFolders } from "@/lib/php-mail-api";
 
 export async function GET() {
   try {
@@ -14,9 +14,7 @@ export async function GET() {
     return NextResponse.json({ folders });
   } catch (error) {
     console.error("Error fetching folders:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch folders" },
-      { status: 500 }
-    );
+    const message = error instanceof Error ? error.message : "Failed to fetch folders";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
