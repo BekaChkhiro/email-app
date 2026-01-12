@@ -43,11 +43,19 @@ export function personalize(content: string, client: Client): string {
 }
 
 /**
+ * Get current hour in local timezone (Georgia/Tbilisi UTC+4)
+ */
+function getLocalHour(): number {
+  const now = new Date();
+  const georgiaTime = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Tbilisi" }));
+  return georgiaTime.getHours();
+}
+
+/**
  * Check if current time is within sending hours
  */
 function isWithinSendingHours(startHour: number, endHour: number): boolean {
-  const now = new Date();
-  const currentHour = now.getHours();
+  const currentHour = getLocalHour();
   return currentHour >= startHour && currentHour < endHour;
 }
 

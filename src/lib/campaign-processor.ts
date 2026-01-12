@@ -21,11 +21,20 @@ const MAX_DELAY_MS = 60 * 1000; // 60 seconds
 const PROCESSOR_INTERVAL_MS = 30 * 1000; // Check every 30 seconds
 
 /**
+ * Get current hour in local timezone (Georgia/Tbilisi UTC+4)
+ */
+function getLocalHour(): number {
+  const now = new Date();
+  // Use Georgia timezone (UTC+4)
+  const georgiaTime = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Tbilisi" }));
+  return georgiaTime.getHours();
+}
+
+/**
  * Check if current time is within sending hours
  */
 function isWithinSendingHours(startHour: number, endHour: number): boolean {
-  const now = new Date();
-  const currentHour = now.getHours();
+  const currentHour = getLocalHour();
   return currentHour >= startHour && currentHour < endHour;
 }
 
@@ -175,8 +184,8 @@ async function processCampaignBatch(campaignId: string): Promise<void> {
     // Check sending hours
     const startHour = campaign.sendStartHour || 9;
     const endHour = campaign.sendEndHour || 18;
+    const currentHour = getLocalHour();
     if (!isWithinSendingHours(startHour, endHour)) {
-      const currentHour = new Date().getHours();
       await campaignLogger.info(
         campaignId,
         "waiting_for_send_window",
