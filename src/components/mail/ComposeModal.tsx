@@ -107,6 +107,10 @@ export function ComposeModal({
     setIsSending(true);
     setError(null);
 
+    console.log("[ComposeModal] Starting email send...");
+    console.log("[ComposeModal] To:", to);
+    console.log("[ComposeModal] Subject:", subject);
+
     try {
       // Prepare attachments
       const attachmentData = [];
@@ -118,35 +122,54 @@ export function ComposeModal({
           contentType: att.file.type,
         });
       }
+      console.log("[ComposeModal] Attachments count:", attachmentData.length);
+
+      const requestBody = {
+        to: to.split(",").map((s) => s.trim()),
+        cc: cc ? cc.split(",").map((s) => s.trim()) : undefined,
+        bcc: bcc ? bcc.split(",").map((s) => s.trim()) : undefined,
+        subject,
+        html: `<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; white-space: pre-wrap;">${body.replace(
+          /\n/g,
+          "<br>"
+        )}</div>`,
+        text: body,
+        attachments: attachmentData.length > 0 ? attachmentData : undefined,
+        inReplyTo: replyTo?.messageId,
+      };
+
+      console.log("[ComposeModal] Sending request to /api/mail/send...");
 
       const res = await fetch("/api/mail/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          to: to.split(",").map((s) => s.trim()),
-          cc: cc ? cc.split(",").map((s) => s.trim()) : undefined,
-          bcc: bcc ? bcc.split(",").map((s) => s.trim()) : undefined,
-          subject,
-          html: `<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; white-space: pre-wrap;">${body.replace(
-            /\n/g,
-            "<br>"
-          )}</div>`,
-          text: body,
-          attachments: attachmentData.length > 0 ? attachmentData : undefined,
-          inReplyTo: replyTo?.messageId,
-        }),
+        body: JSON.stringify(requestBody),
       });
 
+      console.log("[ComposeModal] Response status:", res.status);
+
       const data = await res.json();
+      console.log("[ComposeModal] Response data:", data);
+
+      // Log server-side logs if available
+      if (data.logs && Array.isArray(data.logs)) {
+        console.log("[ComposeModal] === SERVER LOGS ===");
+        data.logs.forEach((log: string) => console.log("[Server]", log));
+        console.log("[ComposeModal] === END SERVER LOGS ===");
+      }
 
       if (!res.ok) {
+        console.error("[ComposeModal] Send failed:", data.error);
         throw new Error(data.error || "Failed to send email");
       }
 
+      console.log("[ComposeModal] Email sent successfully! MessageId:", data.messageId);
       onSent();
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to send email");
+      const errorMsg = err instanceof Error ? err.message : "Failed to send email";
+      console.error("[ComposeModal] Error:", errorMsg);
+      setError(errorMsg);
     } finally {
       setIsSending(false);
     }

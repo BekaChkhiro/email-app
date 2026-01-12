@@ -59,8 +59,18 @@ function createTransporter(): nodemailer.Transporter {
 // =====================
 
 export async function sendMail(options: SendMailOptions): Promise<SendResult> {
+  console.log("[SMTP] sendMail called");
+
   try {
+    console.log("[SMTP] Getting SMTP config...");
+    console.log(`[SMTP] SMTP_HOST: ${process.env.SMTP_HOST}`);
+    console.log(`[SMTP] SMTP_PORT: ${process.env.SMTP_PORT || "465"}`);
+    console.log(`[SMTP] SMTP_USER: ${process.env.SMTP_USER}`);
+    console.log(`[SMTP] SMTP_SECURE: ${process.env.SMTP_SECURE !== "false"}`);
+
     const transport = createTransporter();
+    console.log("[SMTP] Transporter created");
+
     const fromName = process.env.EMAIL_CLIENT_FROM_NAME || "Email Client";
     const fromEmail = process.env.SMTP_USER;
 
@@ -93,7 +103,12 @@ export async function sendMail(options: SendMailOptions): Promise<SendResult> {
       references: options.references,
     };
 
+    console.log(`[SMTP] Sending email from ${mailOptions.from} to ${mailOptions.to}`);
+    console.log("[SMTP] Calling transport.sendMail...");
+
     const result = await transport.sendMail(mailOptions);
+
+    console.log(`[SMTP] Email sent successfully! MessageId: ${result.messageId}`);
 
     // Build raw email for saving to Sent folder
     const rawEmail = await buildRawEmail(mailOptions);
@@ -104,10 +119,14 @@ export async function sendMail(options: SendMailOptions): Promise<SendResult> {
       rawEmail,
     };
   } catch (error) {
-    console.error("SMTP send error:", error);
+    const errMsg = error instanceof Error ? error.message : String(error);
+    const errCode = (error as NodeJS.ErrnoException)?.code;
+    console.error(`[SMTP] ERROR: ${errMsg}`);
+    console.error(`[SMTP] Error code: ${errCode}`);
+    console.error("[SMTP] Full error:", error);
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Failed to send email",
+      error: `SMTP Error: ${errMsg}${errCode ? ` (code: ${errCode})` : ""}`,
     };
   }
 }
