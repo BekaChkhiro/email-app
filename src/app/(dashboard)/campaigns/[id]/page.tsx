@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
-import { CampaignConsole } from "@/components/campaigns";
+import { CampaignConsole, EmailTrackingModal } from "@/components/campaigns";
 
 interface CampaignDetail {
   id: string;
@@ -64,6 +64,10 @@ export default function CampaignDetailPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isUpdating, setIsUpdating] = useState(false);
   const [activeTab, setActiveTab] = useState<"recipients" | "activity" | "logs">("recipients");
+  const [trackingModal, setTrackingModal] = useState<{
+    isOpen: boolean;
+    status: "delivered" | "opened" | "clicked" | "bounced" | "complained" | null;
+  }>({ isOpen: false, status: null });
 
   // Fetch campaign data
   const fetchCampaign = useCallback(async () => {
@@ -458,30 +462,42 @@ export default function CampaignDetailPage() {
               <div className="mt-6 pt-4 border-t border-slate-100">
                 <h3 className="text-sm font-medium text-slate-700 mb-3">Email Tracking</h3>
                 <div className="grid grid-cols-4 gap-4">
-                  <div className="text-center p-3 bg-blue-50 rounded-lg">
+                  <button
+                    onClick={() => setTrackingModal({ isOpen: true, status: "delivered" })}
+                    className="text-center p-3 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors cursor-pointer"
+                  >
                     <p className="text-2xl font-bold text-blue-600">
                       {campaign.emailStats?.delivered || 0}
                     </p>
                     <p className="text-xs text-blue-600">Delivered</p>
-                  </div>
-                  <div className="text-center p-3 bg-purple-50 rounded-lg">
+                  </button>
+                  <button
+                    onClick={() => setTrackingModal({ isOpen: true, status: "opened" })}
+                    className="text-center p-3 bg-purple-50 rounded-lg hover:bg-purple-100 transition-colors cursor-pointer"
+                  >
                     <p className="text-2xl font-bold text-purple-600">
                       {campaign.emailStats?.opened || 0}
                     </p>
                     <p className="text-xs text-purple-600">Opened</p>
-                  </div>
-                  <div className="text-center p-3 bg-emerald-50 rounded-lg">
+                  </button>
+                  <button
+                    onClick={() => setTrackingModal({ isOpen: true, status: "clicked" })}
+                    className="text-center p-3 bg-emerald-50 rounded-lg hover:bg-emerald-100 transition-colors cursor-pointer"
+                  >
                     <p className="text-2xl font-bold text-emerald-600">
                       {campaign.emailStats?.clicked || 0}
                     </p>
                     <p className="text-xs text-emerald-600">Clicked</p>
-                  </div>
-                  <div className="text-center p-3 bg-orange-50 rounded-lg">
+                  </button>
+                  <button
+                    onClick={() => setTrackingModal({ isOpen: true, status: "bounced" })}
+                    className="text-center p-3 bg-orange-50 rounded-lg hover:bg-orange-100 transition-colors cursor-pointer"
+                  >
                     <p className="text-2xl font-bold text-orange-600">
                       {campaign.emailStats?.bounced || 0}
                     </p>
                     <p className="text-xs text-orange-600">Bounced</p>
-                  </div>
+                  </button>
                 </div>
               </div>
             )}
@@ -750,6 +766,15 @@ export default function CampaignDetailPage() {
           )}
         </div>
       </div>
+
+      {/* Email Tracking Modal */}
+      <EmailTrackingModal
+        isOpen={trackingModal.isOpen}
+        onClose={() => setTrackingModal({ isOpen: false, status: null })}
+        campaignId={id}
+        status={trackingModal.status}
+        count={campaign.emailStats?.[trackingModal.status || "delivered"] || 0}
+      />
     </div>
   );
 }
